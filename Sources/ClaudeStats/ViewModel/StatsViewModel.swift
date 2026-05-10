@@ -52,10 +52,10 @@ final class StatsViewModel {
         do {
             // Today total — independent of selected range.
             let todayBounds = TimeRange.today.bounds(now: now, calendar: cal)
-            todayTokens = try store.totalTokens(start: todayBounds.start, end: todayBounds.end)
+            let nextTodayTokens = try store.totalTokens(start: todayBounds.start, end: todayBounds.end)
 
             // Project rows for the selected range.
-            projectRows = try store.tokensByProject(start: bounds.start, end: bounds.end)
+            let nextProjectRows = try store.tokensByProject(start: bounds.start, end: bounds.end)
 
             // Overview
             let totals = try store.tokenTotals(start: bounds.start, end: bounds.end)
@@ -77,17 +77,22 @@ final class StatsViewModel {
             let denom = totals.input + totals.cacheCreate + totals.cacheRead
             let hitRate = denom == 0 ? 0 : Double(totals.cacheRead) / Double(denom)
 
-            overview = Overview(
+            let nextOverview = Overview(
                 totalTokens: totals.total,
                 totalCost: totalCost,
                 sessionCount: sessions,
-                projectCount: projectRows.count,
+                projectCount: nextProjectRows.count,
                 cacheHitRate: hitRate,
                 dailyTokens: dailyTokens,
                 byModel: byModel,
                 priorTotalTokens: priorTokens,
                 priorTotalCost: priorCost
             )
+
+            // Atomic assignment of all published state.
+            todayTokens = nextTodayTokens
+            projectRows = nextProjectRows
+            overview = nextOverview
         } catch {
             // Leave previous state on error; surfaced via logging when wired.
         }
