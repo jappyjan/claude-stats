@@ -41,6 +41,14 @@ final class UsageStore {
         let lastTimestamp: Date
         let totalTokens: Int
     }
+    struct ProjectModelRow: Equatable {
+        let projectKey: String
+        let model: String
+        let inputTokens: Int
+        let outputTokens: Int
+        let cacheCreateTokens: Int
+        let cacheReadTokens: Int
+    }
 
     private let db: SQLite
 
@@ -151,6 +159,26 @@ final class UsageStore {
                 cacheCreateTokens: Int(stmt.int(4)),
                 cacheReadTokens: Int(stmt.int(5)),
                 sessionCount: Int(stmt.int(6))
+            ))
+        }
+        return rows
+    }
+
+    func tokensByProjectAndModel(start: Date, end: Date) throws -> [ProjectModelRow] {
+        let stmt = try db.prepare("""
+            SELECT project_key, model,
+                   SUM(input_tokens), SUM(output_tokens),
+                   SUM(cache_create_tokens), SUM(cache_read_tokens)
+            FROM usage_event WHERE timestamp BETWEEN ? AND ?
+            GROUP BY project_key, model
+        """)
+        stmt.bind(1, clampedTimestamp(start)).bind(2, clampedTimestamp(end))
+        var rows: [ProjectModelRow] = []
+        while try stmt.step() {
+            rows.append(ProjectModelRow(
+                projectKey: stmt.string(0), model: stmt.string(1),
+                inputTokens: Int(stmt.int(2)), outputTokens: Int(stmt.int(3)),
+                cacheCreateTokens: Int(stmt.int(4)), cacheReadTokens: Int(stmt.int(5))
             ))
         }
         return rows

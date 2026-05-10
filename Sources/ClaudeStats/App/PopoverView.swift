@@ -22,7 +22,7 @@ struct PopoverView: View {
                     case .projects:
                         ProjectsView(
                             rows: viewModel.projectRows,
-                            costs: [:],  // Task 14 replaces with viewModel.projectCosts
+                            costs: viewModel.projectCosts,
                             onSelect: { key in
                                 drillProjectKey = key
                                 Task { drillDetail = await viewModel.projectDetail(for: key) }

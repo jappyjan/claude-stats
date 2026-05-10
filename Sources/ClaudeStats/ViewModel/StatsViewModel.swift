@@ -33,6 +33,7 @@ final class StatsViewModel {
     var isActive: Bool = false
     var overview: Overview = .init()
     var projectRows: [UsageStore.ProjectRow] = []
+    var projectCosts: [String: Double] = [:]
 
     init(store: UsageStore, pricing: PricingTable) {
         self.store = store
@@ -56,6 +57,17 @@ final class StatsViewModel {
 
             // Project rows for the selected range.
             let nextProjectRows = try store.tokensByProject(start: bounds.start, end: bounds.end)
+
+            let projModelRows = try store.tokensByProjectAndModel(start: bounds.start, end: bounds.end)
+            var nextProjectCosts: [String: Double] = [:]
+            for r in projModelRows {
+                let c = pricing.cost(model: r.model,
+                                     input: r.inputTokens,
+                                     output: r.outputTokens,
+                                     cacheCreate: r.cacheCreateTokens,
+                                     cacheRead: r.cacheReadTokens)
+                if let c { nextProjectCosts[r.projectKey, default: 0] += c }
+            }
 
             // Overview
             let totals = try store.tokenTotals(start: bounds.start, end: bounds.end)
@@ -92,6 +104,7 @@ final class StatsViewModel {
             // Atomic assignment of all published state.
             todayTokens = nextTodayTokens
             projectRows = nextProjectRows
+            projectCosts = nextProjectCosts
             overview = nextOverview
         } catch {
             // Leave previous state on error; surfaced via logging when wired.
