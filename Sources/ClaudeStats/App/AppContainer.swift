@@ -49,6 +49,16 @@ final class AppContainer {
         }
     }
 
+    func rebuildIndex() async {
+        let appSupport = (try? FileManager.default.url(
+            for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false
+        ).appendingPathComponent("claude-stats")) ?? URL(fileURLWithPath: "/")
+        try? FileManager.default.removeItem(at: appSupport.appendingPathComponent("usage.db"))
+        try? FileManager.default.removeItem(at: appSupport.appendingPathComponent("usage.db-wal"))
+        try? FileManager.default.removeItem(at: appSupport.appendingPathComponent("usage.db-shm"))
+        // App relaunch is required for the new DB to be used; the UI prompts the user.
+    }
+
     func startBackgroundWork() {
         monitor.start()
         Task { await refreshPricingNow() }

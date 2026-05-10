@@ -2,9 +2,11 @@ import SwiftUI
 
 struct PopoverView: View {
     @Bindable var viewModel: StatsViewModel
+    let container: AppContainer
     @State private var section: Section = .overview
     @State private var drillProjectKey: String? = nil
     @State private var drillDetail: StatsViewModel.ProjectDetail? = nil
+    @State private var showSettings = false
 
     enum Section: String, CaseIterable { case overview, projects }
 
@@ -36,6 +38,20 @@ struct PopoverView: View {
                 }
             } else {
                 ProgressView().frame(maxWidth: .infinity, minHeight: 80)
+            }
+
+            Divider()
+            HStack {
+                Text("\(viewModel.overview.projectCount) project\(viewModel.overview.projectCount == 1 ? "" : "s") · \(viewModel.overview.sessionCount) session\(viewModel.overview.sessionCount == 1 ? "" : "s")")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                Spacer()
+                Button(action: { showSettings = true }) {
+                    Image(systemName: "gearshape").font(.system(size: 11))
+                }.buttonStyle(.plain).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 6)
+            .sheet(isPresented: $showSettings) {
+                SettingsSheet(container: container)
             }
         }
         .padding(.vertical, 4)

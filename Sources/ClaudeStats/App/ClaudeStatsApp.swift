@@ -6,7 +6,7 @@ struct ClaudeStatsApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            PopoverView(viewModel: container.viewModel)
+            PopoverView(viewModel: container.viewModel, container: container)
                 .frame(width: 380)
                 .onAppear { container.startBackgroundWork() }
         } label: {
