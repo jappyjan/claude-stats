@@ -1,5 +1,13 @@
 import Foundation
 
+/// Safely convert a Date's timeIntervalSince1970 to Int64, clamping to Int64 bounds.
+private func clampedTimestamp(_ date: Date) -> Int64 {
+    let t = date.timeIntervalSince1970
+    if t >= Double(Int64.max) { return Int64.max }
+    if t <= Double(Int64.min) { return Int64.min }
+    return Int64(t)
+}
+
 final class UsageStore {
     struct ProjectRow: Equatable {
         let projectKey: String
@@ -94,7 +102,7 @@ final class UsageStore {
             SELECT COALESCE(SUM(input_tokens + output_tokens + cache_create_tokens + cache_read_tokens), 0)
             FROM usage_event WHERE timestamp BETWEEN ? AND ?
         """)
-        stmt.bind(1, Int64(start.timeIntervalSince1970)).bind(2, Int64(end.timeIntervalSince1970))
+        stmt.bind(1, clampedTimestamp(start)).bind(2, clampedTimestamp(end))
         _ = try stmt.step()
         return Int(stmt.int(0))
     }
@@ -105,7 +113,7 @@ final class UsageStore {
                    COALESCE(SUM(cache_create_tokens),0), COALESCE(SUM(cache_read_tokens),0)
             FROM usage_event WHERE timestamp BETWEEN ? AND ?
         """)
-        stmt.bind(1, Int64(start.timeIntervalSince1970)).bind(2, Int64(end.timeIntervalSince1970))
+        stmt.bind(1, clampedTimestamp(start)).bind(2, clampedTimestamp(end))
         _ = try stmt.step()
         return TokenTotals(
             input: Int(stmt.int(0)), output: Int(stmt.int(1)),
@@ -117,7 +125,7 @@ final class UsageStore {
         let stmt = try db.prepare("""
             SELECT COUNT(DISTINCT session_id) FROM usage_event WHERE timestamp BETWEEN ? AND ?
         """)
-        stmt.bind(1, Int64(start.timeIntervalSince1970)).bind(2, Int64(end.timeIntervalSince1970))
+        stmt.bind(1, clampedTimestamp(start)).bind(2, clampedTimestamp(end))
         _ = try stmt.step()
         return Int(stmt.int(0))
     }
@@ -132,7 +140,7 @@ final class UsageStore {
             FROM usage_event WHERE timestamp BETWEEN ? AND ?
             GROUP BY project_key ORDER BY 2 DESC
         """)
-        stmt.bind(1, Int64(start.timeIntervalSince1970)).bind(2, Int64(end.timeIntervalSince1970))
+        stmt.bind(1, clampedTimestamp(start)).bind(2, clampedTimestamp(end))
         var rows: [ProjectRow] = []
         while try stmt.step() {
             rows.append(ProjectRow(
@@ -160,7 +168,7 @@ final class UsageStore {
             FROM usage_event WHERE \(where_)
             GROUP BY model ORDER BY 2 DESC
         """)
-        stmt.bind(1, Int64(start.timeIntervalSince1970)).bind(2, Int64(end.timeIntervalSince1970))
+        stmt.bind(1, clampedTimestamp(start)).bind(2, clampedTimestamp(end))
         if let projectKey = projectKey { stmt.bind(3, projectKey) }
         var rows: [ModelRow] = []
         while try stmt.step() {
@@ -183,8 +191,8 @@ final class UsageStore {
             FROM usage_event WHERE timestamp BETWEEN ? AND ? AND project_key = ?
             GROUP BY session_id ORDER BY MAX(timestamp) DESC LIMIT ?
         """)
-        stmt.bind(1, Int64(start.timeIntervalSince1970))
-            .bind(2, Int64(end.timeIntervalSince1970))
+        stmt.bind(1, clampedTimestamp(start))
+            .bind(2, clampedTimestamp(end))
             .bind(3, projectKey)
             .bind(4, limit)
         var rows: [SessionRow] = []
@@ -206,7 +214,7 @@ final class UsageStore {
             SELECT timestamp, input_tokens + output_tokens + cache_create_tokens + cache_read_tokens
             FROM usage_event WHERE timestamp BETWEEN ? AND ?
         """)
-        stmt.bind(1, Int64(start.timeIntervalSince1970)).bind(2, Int64(end.timeIntervalSince1970))
+        stmt.bind(1, clampedTimestamp(start)).bind(2, clampedTimestamp(end))
         var result: [Date: Int] = [:]
         while try stmt.step() {
             let ts = Date(timeIntervalSince1970: TimeInterval(stmt.int(0)))
