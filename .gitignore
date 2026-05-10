@@ -3,4 +3,6 @@
 .DS_Store
 *.xcodeproj
 ClaudeStats.app/
+ClaudeStats.dmg
+ClaudeStats.zip
 .superpowers/

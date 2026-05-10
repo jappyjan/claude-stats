@@ -6,12 +6,15 @@ No API keys, no daemons, no third-party services.
 
 ## Install
 
-    git clone <repo>
+**Easiest:** download the latest [`ClaudeStats.dmg`](https://github.com/jappyjan/claude-stats/releases/latest), open it, and drag the app into `Applications`. Right-click → Open the first time so Gatekeeper lets it through.
+
+**From source:**
+
+    git clone https://github.com/jappyjan/claude-stats.git
     cd claude-stats
     ./scripts/install.sh
 
 The app will appear in `~/Applications/ClaudeStats.app` and launch automatically.
-On first launch, allow it through Gatekeeper (right-click → Open).
 
 ## Where the data comes from
 
