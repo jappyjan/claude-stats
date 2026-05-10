@@ -28,8 +28,12 @@ final class ActivityMonitor {
     func stop() { timer?.invalidate(); timer = nil }
 
     func tickNow() {
-        try? reader.scan()
-        onTick?()
+        Task.detached { [reader] in
+            try? reader.scan()
+            await MainActor.run { [weak self] in
+                self?.onTick?()
+            }
+        }
     }
 
     var isActive: Bool { reader.isActive(within: activeThreshold) }

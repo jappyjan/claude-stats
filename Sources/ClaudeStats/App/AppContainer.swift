@@ -9,6 +9,10 @@ final class AppContainer {
     let pricingFetcher: PricingFetcher
     let viewModel: StatsViewModel
 
+    private var midnightTimer: Timer?
+    private var pricingTimer: Timer?
+    private var wakeObserver: NSObjectProtocol?
+
     init() {
         let appSupport = try! FileManager.default.url(
             for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
@@ -75,6 +79,7 @@ final class AppContainer {
     }
 
     private func scheduleMidnightRollover() {
+        midnightTimer?.invalidate()
         let cal = Calendar.current
         let now = Date()
         guard let tomorrow = cal.date(byAdding: .day, value: 1, to: now),
@@ -82,7 +87,7 @@ final class AppContainer {
             return
         }
         let interval = nextMidnight.timeIntervalSince(now)
-        Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
+        midnightTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
             Task { @MainActor in
                 await self?.viewModel.refresh()
                 self?.scheduleMidnightRollover()
@@ -91,13 +96,17 @@ final class AppContainer {
     }
 
     private func scheduleDailyPricingRefresh() {
-        Timer.scheduledTimer(withTimeInterval: 86400, repeats: true) { [weak self] _ in
+        pricingTimer?.invalidate()
+        pricingTimer = Timer.scheduledTimer(withTimeInterval: 86400, repeats: true) { [weak self] _ in
             Task { await self?.refreshPricingNow() }
         }
     }
 
     private func registerWakeNotifications() {
-        NSWorkspace.shared.notificationCenter.addObserver(
+        if let token = wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(token)
+        }
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in

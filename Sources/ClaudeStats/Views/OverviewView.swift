@@ -44,6 +44,11 @@ struct OverviewView: View {
             let sign = delta >= 0 ? "+" : ""
             return "\(sign)\(Int(delta.rounded()))% vs prior period"
         }
+        if range == .all, let first = overview.firstEventDate {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            return "since \(formatter.string(from: first))"
+        }
         return ""
     }
     private var costSub: String {
@@ -51,6 +56,11 @@ struct OverviewView: View {
             let delta = (overview.totalCost - prior) / prior * 100
             let sign = delta >= 0 ? "+" : ""
             return "\(sign)\(Int(delta.rounded()))% vs prior period"
+        }
+        if range == .all, let first = overview.firstEventDate {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            return "since \(formatter.string(from: first))"
         }
         return ""
     }

@@ -7,7 +7,7 @@ struct ClaudeStatsApp: App {
     var body: some Scene {
         MenuBarExtra {
             PopoverView(viewModel: container.viewModel, container: container)
-                .frame(width: 380)
+                .frame(width: 380, height: 480)
                 .onAppear { container.startBackgroundWork() }
         } label: {
             HStack(spacing: 4) {

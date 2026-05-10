@@ -1,6 +1,6 @@
 import Foundation
 
-final class UsageReader {
+final class UsageReader: @unchecked Sendable {
     private let rootDir: URL
     private let store: UsageStore
     private let parser = JSONLParser()

@@ -5,7 +5,7 @@ actor PricingFetcher {
         "https://raw.githubusercontent.com/BerriAI/litellm/main/litellm/model_prices_and_context_window_backup.json"
     )!
     /// Cache TTL — re-fetch when cached copy is older than this.
-    static let cacheTTL: TimeInterval = 7 * 86400
+    static let cacheTTL: TimeInterval = 86400
 
     private let cacheDir: URL
     private let bundledFallback: Data

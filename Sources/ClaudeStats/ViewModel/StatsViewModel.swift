@@ -14,6 +14,7 @@ final class StatsViewModel {
         var byModel: [UsageStore.ModelRow] = []
         var priorTotalTokens: Int? = nil
         var priorTotalCost: Double? = nil
+        var firstEventDate: Date? = nil
     }
 
     struct ProjectDetail: Equatable {
@@ -86,6 +87,8 @@ final class StatsViewModel {
                 priorCost = computeCost(byModel: priorByModel)
             }
 
+            let firstDate = try store.earliestTimestamp(start: bounds.start, end: bounds.end)
+
             let denom = totals.input + totals.cacheCreate + totals.cacheRead
             let hitRate = denom == 0 ? 0 : Double(totals.cacheRead) / Double(denom)
 
@@ -98,7 +101,8 @@ final class StatsViewModel {
                 dailyTokens: dailyTokens,
                 byModel: byModel,
                 priorTotalTokens: priorTokens,
-                priorTotalCost: priorCost
+                priorTotalCost: priorCost,
+                firstEventDate: firstDate
             )
 
             // Atomic assignment of all published state.

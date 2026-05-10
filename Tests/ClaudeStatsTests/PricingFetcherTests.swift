@@ -57,7 +57,7 @@ final class PricingFetcherTests: XCTestCase {
         // Pre-seed STALE cache (8 days old).
         let stale = #"{"claude-stale":{"input_cost_per_token":1,"output_cost_per_token":1}}"#
         try Data(stale.utf8).write(to: cacheDir.appendingPathComponent("pricing.json"))
-        let oldTime = Date().timeIntervalSince1970 - (8 * 86400)
+        let oldTime = Date().timeIntervalSince1970 - (2 * 86400)  // 2 days old
         try "\(oldTime)".write(
             to: cacheDir.appendingPathComponent("pricing.json.fetched_at"),
             atomically: true, encoding: .utf8

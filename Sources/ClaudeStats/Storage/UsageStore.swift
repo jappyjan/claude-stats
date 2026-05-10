@@ -8,7 +8,7 @@ private func clampedTimestamp(_ date: Date) -> Int64 {
     return Int64(t)
 }
 
-final class UsageStore {
+final class UsageStore: @unchecked Sendable {
     struct ProjectRow: Equatable {
         let projectKey: String
         let totalTokens: Int
@@ -250,6 +250,16 @@ final class UsageStore {
             result[day, default: 0] += Int(stmt.int(1))
         }
         return result
+    }
+
+    func earliestTimestamp(start: Date, end: Date) throws -> Date? {
+        let stmt = try db.prepare("""
+            SELECT MIN(timestamp) FROM usage_event WHERE timestamp BETWEEN ? AND ?
+        """)
+        stmt.bind(1, clampedTimestamp(start)).bind(2, clampedTimestamp(end))
+        _ = try stmt.step()
+        let value = stmt.int(0)
+        return value == 0 ? nil : Date(timeIntervalSince1970: TimeInterval(value))
     }
 
     func upsertFileState(path: String, mtime: Int64, lastOffset: Int64, scannedAt: Int64 = Int64(Date().timeIntervalSince1970)) throws {
