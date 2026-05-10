@@ -14,7 +14,11 @@ final class UsageReader {
     func scan() throws {
         guard FileManager.default.fileExists(atPath: rootDir.path) else { return }
         for url in jsonlFiles() {
-            try processFile(url)
+            do {
+                try processFile(url)
+            } catch {
+                // Per-file failure: skip and continue. A single bad file shouldn't kill the scan.
+            }
         }
     }
 
@@ -22,8 +26,8 @@ final class UsageReader {
     func isActive(within seconds: TimeInterval) -> Bool {
         let cutoff = Date().addingTimeInterval(-seconds)
         for url in jsonlFiles() {
-            if let mtime = try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date,
-               mtime > cutoff {
+            let values = try? url.resourceValues(forKeys: [.contentModificationDateKey])
+            if let mtime = values?.contentModificationDate, mtime > cutoff {
                 return true
             }
         }
@@ -49,11 +53,10 @@ final class UsageReader {
     private func processFile(_ url: URL) throws {
         let attrs = try FileManager.default.attributesOfItem(atPath: url.path)
         guard let mdate = attrs[.modificationDate] as? Date else { return }
-        let mtime = Int64(mdate.timeIntervalSince1970)
-        let size = (attrs[.size] as? Int64) ?? 0
+        let mtime = Int64(mdate.timeIntervalSince1970 * 1_000_000_000)
 
         let prior = try store.fileState(path: url.path)
-        if let prior = prior, prior.mtime == mtime, prior.lastOffset == size {
+        if let prior = prior, prior.mtime == mtime {
             return // unchanged
         }
 
