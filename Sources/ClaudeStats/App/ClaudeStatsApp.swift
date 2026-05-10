@@ -9,7 +9,6 @@ struct ClaudeStatsApp: App {
             PopoverView(viewModel: container.viewModel, container: container)
                 .frame(width: 380)
                 .frame(maxHeight: 480)
-                .onAppear { container.startBackgroundWork() }
         } label: {
             HStack(spacing: 4) {
                 Circle()
@@ -18,6 +17,7 @@ struct ClaudeStatsApp: App {
                 Text(formatTokens(container.viewModel.todayTokens))
                     .font(.system(size: 13, weight: .regular).monospacedDigit())
             }
+            .task { container.startBackgroundWork() }
         }
         .menuBarExtraStyle(.window)
 
