@@ -1,0 +1,6 @@
+{"type":"user","message":{"role":"user","content":"hello"},"timestamp":"2026-05-10T10:00:00.000Z","sessionId":"abc","cwd":"/Users/jappy/code/jappyjan/claude-stats"}
+{"type":"assistant","message":{"model":"claude-opus-4-7","role":"assistant","usage":{"input_tokens":100,"output_tokens":200,"cache_creation_input_tokens":50,"cache_read_input_tokens":300}},"timestamp":"2026-05-10T10:00:05.000Z","sessionId":"abc","cwd":"/Users/jappy/code/jappyjan/claude-stats"}
+{"type":"progress","data":{"hookEvent":"PostToolUse"},"timestamp":"2026-05-10T10:00:06.000Z","sessionId":"abc","cwd":"/Users/jappy/code/jappyjan/claude-stats"}
+{"type":"assistant","message":{"model":"claude-sonnet-4-6","role":"assistant","usage":{"input_tokens":10,"output_tokens":20,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}},"timestamp":"2026-05-10T10:01:00.000Z","sessionId":"abc","cwd":"/Users/jappy/code/jappyjan/claude-stats"}
+{this line is malformed JSON
+{"type":"queue-operation","operation":"enqueue","timestamp":"2026-05-10T10:02:00.000Z","sessionId":"abc"}
