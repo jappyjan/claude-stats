@@ -28,26 +28,29 @@ enum TimeRange: String, CaseIterable, Identifiable {
         case .today:
             return Bounds(start: midnight, end: now)
         case .last7Days:
-            return Bounds(start: midnight.addingTimeInterval(-6 * 86400), end: now)
+            let start = calendar.date(byAdding: .day, value: -6, to: midnight) ?? midnight
+            return Bounds(start: start, end: now)
         case .last30Days:
-            return Bounds(start: midnight.addingTimeInterval(-29 * 86400), end: now)
+            let start = calendar.date(byAdding: .day, value: -29, to: midnight) ?? midnight
+            return Bounds(start: start, end: now)
         case .all:
             return Bounds(start: Date(timeIntervalSince1970: 0), end: now)
         }
     }
 
     /// Window immediately preceding `bounds`. Nil for `.all`.
-    /// Shift = (midnight - current.start) + 86400, so that `.today` yields the full
-    /// prior calendar day and `.last7Days` / `.last30Days` yield their equal-length
-    /// full-day windows immediately before the current period.
     func priorBounds(now: Date = Date(), calendar: Calendar = .current) -> Bounds? {
         guard self != .all else { return nil }
         let current = bounds(now: now, calendar: calendar)
-        let midnight = calendar.startOfDay(for: now)
-        let shift = midnight.timeIntervalSince(current.start) + 86400
-        return Bounds(
-            start: current.start.addingTimeInterval(-shift),
-            end: current.start
-        )
+        let priorEnd = current.start
+        let dayCount: Int
+        switch self {
+        case .today: dayCount = 1
+        case .last7Days: dayCount = 7
+        case .last30Days: dayCount = 30
+        case .all: return nil // unreachable due to guard above
+        }
+        let priorStart = calendar.date(byAdding: .day, value: -dayCount, to: priorEnd) ?? priorEnd
+        return Bounds(start: priorStart, end: priorEnd)
     }
 }

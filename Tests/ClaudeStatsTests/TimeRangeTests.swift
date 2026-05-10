@@ -41,6 +41,20 @@ final class TimeRangeTests: XCTestCase {
         XCTAssertNil(TimeRange.all.priorBounds(now: now, calendar: utc()))
     }
 
+    func testPriorPeriodSevenDaysIsPrevious7Days() {
+        let r = TimeRange.last7Days.priorBounds(now: now, calendar: utc())
+        let midnight = Date(timeIntervalSince1970: 1778371200)
+        XCTAssertEqual(r?.start, midnight.addingTimeInterval(-13 * 86400))
+        XCTAssertEqual(r?.end, midnight.addingTimeInterval(-6 * 86400))
+    }
+
+    func testPriorPeriodThirtyDaysIsPrevious30Days() {
+        let r = TimeRange.last30Days.priorBounds(now: now, calendar: utc())
+        let midnight = Date(timeIntervalSince1970: 1778371200)
+        XCTAssertEqual(r?.start, midnight.addingTimeInterval(-59 * 86400))
+        XCTAssertEqual(r?.end, midnight.addingTimeInterval(-29 * 86400))
+    }
+
     private func utc() -> Calendar {
         var c = Calendar(identifier: .gregorian)
         c.timeZone = TimeZone(identifier: "UTC")!
