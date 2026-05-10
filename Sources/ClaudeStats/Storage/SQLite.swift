@@ -18,15 +18,14 @@ final class SQLite {
         sqlite3_exec(h, "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;", nil, nil, nil)
     }
 
-    deinit { sqlite3_close(handle) }
+    deinit { sqlite3_close_v2(handle) }
 
     func exec(_ sql: String) throws {
         var err: UnsafeMutablePointer<CChar>?
         let rc = sqlite3_exec(handle, sql, nil, nil, &err)
+        defer { sqlite3_free(err) }
         if rc != SQLITE_OK {
-            let msg = err.map { String(cString: $0) } ?? "exec failed"
-            sqlite3_free(err)
-            throw DBError.exec(msg)
+            throw DBError.exec(err.map { String(cString: $0) } ?? "exec failed")
         }
     }
 

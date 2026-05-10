@@ -91,4 +91,33 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(totals.cacheCreate, 150)
         XCTAssertEqual(totals.cacheRead, 1000)
     }
+
+    func testDailyTokensGroupsByLocalDay() throws {
+        let store = try makeStore()
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        // 2026-05-10 12:00 UTC and 2026-05-10 23:30 UTC are the same UTC day.
+        // 2026-05-11 00:30 UTC is the next day.
+        let day1Noon = Date(timeIntervalSince1970: 1778414400)   // 2026-05-10 12:00 UTC
+        let day1Late = Date(timeIntervalSince1970: 1778455800)   // 2026-05-10 23:30 UTC
+        let day2Early = Date(timeIntervalSince1970: 1778459400)  // 2026-05-11 00:30 UTC
+        try store.insert([
+            UsageEntry(timestamp: day1Noon, sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 10, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: day1Late, sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 5, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: day2Early, sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 7, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0),
+        ])
+        let result = try store.dailyTokens(
+            start: Date(timeIntervalSince1970: 0),
+            end: Date(timeIntervalSince1970: 2_000_000_000),
+            calendar: utc
+        )
+        let day1Midnight = Date(timeIntervalSince1970: 1778371200)  // 2026-05-10 00:00 UTC
+        let day2Midnight = Date(timeIntervalSince1970: 1778457600)  // 2026-05-11 00:00 UTC
+        XCTAssertEqual(result[day1Midnight], 15)
+        XCTAssertEqual(result[day2Midnight], 7)
+        XCTAssertEqual(result.count, 2)
+    }
 }
