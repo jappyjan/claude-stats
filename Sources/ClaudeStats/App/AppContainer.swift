@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 @MainActor
@@ -50,9 +51,48 @@ final class AppContainer {
 
     func startBackgroundWork() {
         monitor.start()
-        Task {
-            if let table = try? await pricingFetcher.load() {
-                await MainActor.run { self.viewModel.update(pricing: table) }
+        Task { await refreshPricingNow() }
+        scheduleMidnightRollover()
+        scheduleDailyPricingRefresh()
+        registerWakeNotifications()
+    }
+
+    private func refreshPricingNow() async {
+        await pricingFetcher.refresh()
+        if let table = try? await pricingFetcher.load() {
+            await MainActor.run { viewModel.update(pricing: table) }
+        }
+    }
+
+    private func scheduleMidnightRollover() {
+        let cal = Calendar.current
+        let now = Date()
+        guard let tomorrow = cal.date(byAdding: .day, value: 1, to: now),
+              let nextMidnight = cal.date(bySettingHour: 0, minute: 0, second: 0, of: tomorrow) else {
+            return
+        }
+        let interval = nextMidnight.timeIntervalSince(now)
+        Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                await self?.viewModel.refresh()
+                self?.scheduleMidnightRollover()
+            }
+        }
+    }
+
+    private func scheduleDailyPricingRefresh() {
+        Timer.scheduledTimer(withTimeInterval: 86400, repeats: true) { [weak self] _ in
+            Task { await self?.refreshPricingNow() }
+        }
+    }
+
+    private func registerWakeNotifications() {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.monitor.tickNow()
+                await self?.refreshPricingNow()
             }
         }
     }
