@@ -7,7 +7,8 @@ struct ClaudeStatsApp: App {
     var body: some Scene {
         MenuBarExtra {
             PopoverView(viewModel: container.viewModel, container: container)
-                .frame(width: 380, height: 480)
+                .frame(width: 380)
+                .frame(maxHeight: 480)
                 .onAppear { container.startBackgroundWork() }
         } label: {
             HStack(spacing: 4) {
@@ -19,6 +20,11 @@ struct ClaudeStatsApp: App {
             }
         }
         .menuBarExtraStyle(.window)
+
+        Window("ClaudeStats Settings", id: "settings") {
+            SettingsView(container: container)
+        }
+        .windowResizability(.contentSize)
     }
 
     private func formatTokens(_ n: Int) -> String {

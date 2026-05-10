@@ -2,25 +2,20 @@ import SwiftUI
 import ServiceManagement
 import AppKit
 
-struct SettingsSheet: View {
-    @Environment(\.dismiss) private var dismiss
+struct SettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     let container: AppContainer
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Settings").font(.system(size: 14, weight: .semibold))
-                Spacer()
-                Button("Done") { dismiss() }
-            }
+            Text("Settings").font(.system(size: 14, weight: .semibold))
+
             Toggle("Launch at login", isOn: $launchAtLogin)
                 .onChange(of: launchAtLogin) { _, on in
                     do {
                         if on { try SMAppService.mainApp.register() }
                         else { try SMAppService.mainApp.unregister() }
                     } catch {
-                        // Revert on failure.
                         launchAtLogin.toggle()
                     }
                 }
@@ -28,7 +23,6 @@ struct SettingsSheet: View {
             Button("Rebuild index (relaunch required)") {
                 Task {
                     await container.rebuildIndex()
-                    dismiss()
                     NSApp.terminate(nil)
                 }
             }
@@ -40,12 +34,14 @@ struct SettingsSheet: View {
                 NSWorkspace.shared.open(url)
             }
 
+            Spacer()
+
             HStack {
                 Spacer()
                 Text("v1.0.0").font(.caption2).foregroundStyle(.secondary)
             }
         }
         .padding(16)
-        .frame(width: 320)
+        .frame(width: 320, height: 220)
     }
 }

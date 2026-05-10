@@ -7,21 +7,21 @@ struct ProjectDetailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
+            HStack(spacing: 0) {
                 Button(action: onBack) {
                     HStack(spacing: 2) {
                         Image(systemName: "chevron.left")
-                        Text("Projects").font(.system(size: 13))
+                        Text("Projects").font(.system(size: 12))
                     }
                     .foregroundStyle(Color.accentColor)
                 }.buttonStyle(.plain)
                 Spacer()
-                Text(ProjectName.display(for: detail.projectKey))
-                    .font(.system(size: 14, weight: .semibold))
-                Spacer()
-                Color.clear.frame(width: 60)
             }
-            .padding(.horizontal, 14).padding(.vertical, 8)
+            .padding(.horizontal, 14).padding(.vertical, 6)
+            .overlay(
+                Text(ProjectName.display(for: detail.projectKey))
+                    .font(.system(size: 13, weight: .semibold))
+            )
             Divider()
 
             ScrollView {
