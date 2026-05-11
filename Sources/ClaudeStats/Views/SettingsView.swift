@@ -38,7 +38,8 @@ struct SettingsView: View {
 
             HStack {
                 Spacer()
-                Text("v1.0.3").font(.caption2).foregroundStyle(.secondary)
+                Text("v" + (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"))
+                    .font(.caption2).foregroundStyle(.secondary)
             }
         }
         .padding(16)
