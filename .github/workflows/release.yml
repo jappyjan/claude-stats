@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # so build.sh's `git describe` fallback works
+
+      - name: Extract version from tag
+        id: ver
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Build .app (release)
+        env:
+          VERSION: ${{ steps.ver.outputs.VERSION }}
+        run: ./scripts/build.sh
+
+      - name: Inject Sparkle public key into Info.plist
+        env:
+          SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
+        run: |
+          /usr/libexec/PlistBuddy -c "Set :SUPublicEDKey $SPARKLE_PUBLIC_KEY" \
+            ClaudeStats.app/Contents/Info.plist
+          # Re-codesign because we just modified Info.plist.
+          codesign --force --deep --sign - ClaudeStats.app
+
+      - name: Build ClaudeStats.dmg (user-facing download)
+        run: ./scripts/build-dmg.sh
+
+      - name: Build ClaudeStats.zip (Sparkle update artifact)
+        run: ditto -c -k --sequesterRsrc --keepParent ClaudeStats.app ClaudeStats.zip
+
+      - name: Sign update with Sparkle EdDSA key
+        id: sign
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          # Write private key to a temp file with restrictive perms; clean up on exit.
+          KEYFILE="$(mktemp)"
+          chmod 600 "$KEYFILE"
+          trap 'rm -f "$KEYFILE"' EXIT
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$KEYFILE"
+
+          # Sparkle ships sign_update as an executable inside the SPM checkout
+          # cache after `swift build` resolved Sparkle. Find it.
+          SIGN_UPDATE="$(find .build -name sign_update -type f -perm +111 | head -1)"
+          if [ -z "$SIGN_UPDATE" ]; then
+            echo "::error::sign_update binary not found under .build/" >&2
+            exit 1
+          fi
+
+          # sign_update emits something like:
+          #   sparkle:edSignature="abc...=" length="3000000"
+          # Parse the values out so we can pass them as env vars to make-appcast.sh.
+          ATTRS="$("$SIGN_UPDATE" -f "$KEYFILE" ClaudeStats.zip)"
+          SIG="$(echo "$ATTRS" | sed -E 's/.*sparkle:edSignature="([^"]+)".*/\1/')"
+          LEN="$(echo "$ATTRS" | sed -E 's/.*length="([^"]+)".*/\1/')"
+
+          echo "SIG=$SIG" >> "$GITHUB_OUTPUT"
+          echo "LEN=$LEN" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ClaudeStats.dmg
+            ClaudeStats.zip
+          generate_release_notes: true
+
+      - name: Generate appcast.xml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SPARKLE_SIGNATURE: ${{ steps.sign.outputs.SIG }}
+          SPARKLE_LENGTH: ${{ steps.sign.outputs.LEN }}
+        run: |
+          mkdir -p public
+          # The release we just uploaded is visible to the API now.
+          gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+            | jq -s 'add' \
+            | ./scripts/make-appcast.sh > public/appcast.xml
+          # Minimal landing page so the GH Pages root isn't a 404.
+          cat > public/index.html <<HTML
+          <!doctype html><meta charset="utf-8"><title>ClaudeStats</title>
+          <body><a href="https://github.com/${GITHUB_REPOSITORY}">ClaudeStats on GitHub</a></body>
+          HTML
+
+      - name: Publish appcast.xml to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          keep_files: false
