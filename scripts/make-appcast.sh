@@ -27,14 +27,17 @@ JSON="$(cat)"
 # `jq -e` exits non-zero if no such release exists.
 RELEASE="$(echo "$JSON" | jq -e '
     [.[] | select(.assets[].name == "ClaudeStats.zip")] | .[0]
-')"
+')" || {
+    echo "make-appcast.sh: no release with a ClaudeStats.zip asset found in input" >&2
+    exit 1
+}
 
 TAG="$(echo "$RELEASE" | jq -r '.tag_name')"
 VERSION="${TAG#v}"
-NAME="$(echo "$RELEASE" | jq -r '.name')"
-HTML_URL="$(echo "$RELEASE" | jq -r '.html_url')"
+NAME="$(echo "$RELEASE" | jq -r '.name | @html')"
+HTML_URL="$(echo "$RELEASE" | jq -r '.html_url | @html')"
 PUBLISHED="$(echo "$RELEASE" | jq -r '.published_at')"
-ZIP_URL="$(echo "$RELEASE" | jq -r '.assets[] | select(.name == "ClaudeStats.zip") | .browser_download_url')"
+ZIP_URL="$(echo "$RELEASE" | jq -r '.assets[] | select(.name == "ClaudeStats.zip") | .browser_download_url | @html')"
 
 cat <<EOF
 <?xml version="1.0" encoding="utf-8"?>
