@@ -4,7 +4,13 @@ import AppKit
 
 struct SettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var autoUpdate: Bool
     let container: AppContainer
+
+    init(container: AppContainer) {
+        self.container = container
+        _autoUpdate = State(initialValue: container.updater.automaticallyChecks)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -19,6 +25,15 @@ struct SettingsView: View {
                         launchAtLogin.toggle()
                     }
                 }
+
+            Toggle("Automatically check for updates", isOn: $autoUpdate)
+                .onChange(of: autoUpdate) { _, on in
+                    container.updater.automaticallyChecks = on
+                }
+
+            Button("Check for updates now") {
+                container.updater.checkForUpdates()
+            }
 
             Button("Rebuild index (relaunch required)") {
                 Task {
@@ -43,6 +58,6 @@ struct SettingsView: View {
             }
         }
         .padding(16)
-        .frame(width: 320, height: 220)
+        .frame(width: 320, height: 280)
     }
 }
