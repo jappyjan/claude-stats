@@ -8,6 +8,10 @@ No API keys, no daemons, no third-party services.
 
 **Easiest:** download the latest [`ClaudeStats.dmg`](https://github.com/jappyjan/claude-stats/releases/latest), open it, and drag the app into `Applications`. Right-click → Open the first time so Gatekeeper lets it through.
 
+> If macOS says **"ClaudeStats is damaged and can't be opened"**, that's just Gatekeeper's quarantine on unsigned apps. Remove the quarantine flag once and you're done:
+>
+>     xattr -dr com.apple.quarantine /Applications/ClaudeStats.app
+
 **From source:**
 
     git clone https://github.com/jappyjan/claude-stats.git

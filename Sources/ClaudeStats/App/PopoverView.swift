@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct PopoverView: View {
     @Bindable var viewModel: StatsViewModel
@@ -48,6 +49,13 @@ struct PopoverView: View {
                 Button(action: { openWindow(id: "settings") }) {
                     Image(systemName: "gearshape").font(.system(size: 11))
                 }.buttonStyle(.plain).foregroundStyle(.secondary)
+                Button(action: { NSApp.terminate(nil) }) {
+                    Image(systemName: "power").font(.system(size: 11))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .keyboardShortcut("q", modifiers: .command)
+                .help("Quit ClaudeStats")
             }
             .padding(.horizontal, 14).padding(.vertical, 6)
         }

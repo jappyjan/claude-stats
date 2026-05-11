@@ -41,4 +41,9 @@ cp "$ICON_SRC" "$ICONSET/icon_512x512@2x.png"
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 rm -rf "$(dirname "$ICONSET")"
 
+# 4. Ad-hoc codesign so Gatekeeper recognizes the bundle as signed rather than
+#    "damaged" after the DMG is quarantined by the browser. Without this,
+#    downloaded copies hit "is damaged and can't be opened" with no bypass.
+codesign --force --deep --sign - "$APP"
+
 echo "Built $APP"

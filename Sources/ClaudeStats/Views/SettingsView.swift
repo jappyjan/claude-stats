@@ -38,7 +38,7 @@ struct SettingsView: View {
 
             HStack {
                 Spacer()
-                Text("v1.0.0").font(.caption2).foregroundStyle(.secondary)
+                Text("v1.0.1").font(.caption2).foregroundStyle(.secondary)
             }
         }
         .padding(16)
