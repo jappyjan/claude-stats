@@ -25,6 +25,14 @@ The app will appear in `~/Applications/ClaudeStats.app` and launch automatically
 `~/.claude/projects/**/*.jsonl` — Claude Code's local session logs.
 The app stores aggregations in `~/Library/Application Support/claude-stats/usage.db`.
 
+## Updates
+
+The app checks for new releases once a day via [Sparkle](https://sparkle-project.org/).
+When a new version is available, you'll see a prompt with release notes and
+an Install button. You can disable automatic checks from
+**Settings → Automatically check for updates** at any time; the "Check for
+updates now" button still works regardless.
+
 ## Pricing
 
 Pulled from [LiteLLM's community pricing JSON](https://raw.githubusercontent.com/BerriAI/litellm/main/litellm/model_prices_and_context_window_backup.json),
