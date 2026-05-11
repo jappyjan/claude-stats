@@ -3,6 +3,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# Resolve version: prefer caller-supplied $VERSION, else most recent git tag.
+if [ -z "${VERSION:-}" ]; then
+    VERSION="$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo '0.0.0-dev')"
+fi
+echo "Building ClaudeStats version: $VERSION"
+
 # 1. Build the release binary.
 swift build -c release
 
@@ -12,6 +18,11 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cp .build/release/claude-stats "$APP/Contents/MacOS/ClaudeStats"
 cp Sources/ClaudeStats/Info.plist "$APP/Contents/Info.plist"
+
+# Inject the version into the .app's Info.plist so Sparkle and the popover
+# both see the same number.
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION"            "$APP/Contents/Info.plist"
 
 # 2. Copy pricing-fallback.json directly into Resources/ so Bundle.main finds it.
 cp Sources/ClaudeStats/Resources/pricing-fallback.json "$APP/Contents/Resources/"
@@ -41,6 +52,8 @@ rm -rf "$(dirname "$ICONSET")"
 # 4. Ad-hoc codesign so Gatekeeper recognizes the bundle as signed rather than
 #    "damaged" after the DMG is quarantined by the browser. Without this,
 #    downloaded copies hit "is damaged and can't be opened" with no bypass.
+#    Re-run this step in CI after SUPublicEDKey is injected, so the signature
+#    covers the final Info.plist contents.
 codesign --force --deep --sign - "$APP"
 
-echo "Built $APP"
+echo "Built $APP at version $VERSION"
