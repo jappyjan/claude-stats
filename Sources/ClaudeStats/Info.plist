@@ -24,5 +24,13 @@
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>SUFeedURL</key>
+    <string>https://jappyjan.github.io/claude-stats/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>PLACEHOLDER_REPLACED_BY_CI</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
 </dict>
 </plist>
