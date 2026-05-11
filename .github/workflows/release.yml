@@ -23,21 +23,21 @@ jobs:
       - name: Install create-dmg
         run: brew install create-dmg
 
+      - name: Inject Sparkle public key into source Info.plist
+        env:
+          SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
+        run: |
+          /usr/libexec/PlistBuddy -c "Set :SUPublicEDKey $SPARKLE_PUBLIC_KEY" \
+            Sources/ClaudeStats/Info.plist
+
       - name: Build .app (release)
         env:
           VERSION: ${{ steps.ver.outputs.VERSION }}
         run: ./scripts/build.sh
 
-      - name: Inject Sparkle public key into Info.plist
-        env:
-          SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
-        run: |
-          /usr/libexec/PlistBuddy -c "Set :SUPublicEDKey $SPARKLE_PUBLIC_KEY" \
-            ClaudeStats.app/Contents/Info.plist
-          # Re-codesign because we just modified Info.plist.
-          codesign --force --deep --sign - ClaudeStats.app
-
       - name: Build ClaudeStats.dmg (user-facing download)
+        env:
+          VERSION: ${{ steps.ver.outputs.VERSION }}
         run: ./scripts/build-dmg.sh
 
       - name: Build ClaudeStats.zip (Sparkle update artifact)
@@ -56,7 +56,7 @@ jobs:
 
           # Sparkle ships sign_update as an executable inside the SPM checkout
           # cache after `swift build` resolved Sparkle. Find it.
-          SIGN_UPDATE="$(find .build -name sign_update -type f -perm +111 | head -1)"
+          SIGN_UPDATE="$(find .build -name sign_update -type f -perm +111 ! -path '*/old_dsa_scripts/*' | head -1)"
           if [ -z "$SIGN_UPDATE" ]; then
             echo "::error::sign_update binary not found under .build/" >&2
             exit 1
