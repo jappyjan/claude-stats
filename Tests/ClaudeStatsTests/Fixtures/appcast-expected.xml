@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>ClaudeStats</title>
+    <link>https://jappyjan.github.io/claude-stats/appcast.xml</link>
+    <description>Most recent ClaudeStats release.</description>
+    <language>en</language>
+    <item>
+      <title>v1.0.4 — auto-update</title>
+      <pubDate>2026-05-12T10:00:00Z</pubDate>
+      <sparkle:version>1.0.4</sparkle:version>
+      <sparkle:shortVersionString>1.0.4</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:releaseNotesLink>https://github.com/jappyjan/claude-stats/releases/tag/v1.0.4</sparkle:releaseNotesLink>
+      <enclosure url="https://github.com/jappyjan/claude-stats/releases/download/v1.0.4/ClaudeStats.zip" sparkle:edSignature="TEST_SIGNATURE_BASE64" length="3000000" type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>

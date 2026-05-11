@@ -1,0 +1,33 @@
+[
+  {
+    "tag_name": "v1.0.4",
+    "name": "v1.0.4 — auto-update",
+    "html_url": "https://github.com/jappyjan/claude-stats/releases/tag/v1.0.4",
+    "published_at": "2026-05-12T10:00:00Z",
+    "assets": [
+      {
+        "name": "ClaudeStats.zip",
+        "browser_download_url": "https://github.com/jappyjan/claude-stats/releases/download/v1.0.4/ClaudeStats.zip",
+        "size": 3000000
+      },
+      {
+        "name": "ClaudeStats.dmg",
+        "browser_download_url": "https://github.com/jappyjan/claude-stats/releases/download/v1.0.4/ClaudeStats.dmg",
+        "size": 3500000
+      }
+    ]
+  },
+  {
+    "tag_name": "v1.0.3",
+    "name": "v1.0.3 — full-bleed app icon",
+    "html_url": "https://github.com/jappyjan/claude-stats/releases/tag/v1.0.3",
+    "published_at": "2026-05-11T08:44:20Z",
+    "assets": [
+      {
+        "name": "ClaudeStats.dmg",
+        "browser_download_url": "https://github.com/jappyjan/claude-stats/releases/download/v1.0.3/ClaudeStats.dmg",
+        "size": 2769644
+      }
+    ]
+  }
+]
