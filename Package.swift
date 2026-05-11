@@ -10,7 +10,7 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "ClaudeStats",
-            resources: [.process("Resources")]
+            exclude: ["Info.plist", "Resources"]
         ),
         .testTarget(
             name: "ClaudeStatsTests",

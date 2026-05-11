@@ -13,11 +13,8 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/claude-stats "$APP/Contents/MacOS/ClaudeStats"
 cp Sources/ClaudeStats/Info.plist "$APP/Contents/Info.plist"
 
-# 2. Bundle the SPM-generated resource bundle (contains pricing-fallback.json).
-RESBUNDLE="$(find .build/release -name 'ClaudeStats_ClaudeStats.bundle' -type d -print -quit)"
-if [ -n "$RESBUNDLE" ]; then
-    cp -R "$RESBUNDLE" "$APP/Contents/Resources/"
-fi
+# 2. Copy pricing-fallback.json directly into Resources/ so Bundle.main finds it.
+cp Sources/ClaudeStats/Resources/pricing-fallback.json "$APP/Contents/Resources/"
 
 # 3. Generate AppIcon.icns from assets/icon.png and bundle it.
 ICON_SRC="assets/icon.png"

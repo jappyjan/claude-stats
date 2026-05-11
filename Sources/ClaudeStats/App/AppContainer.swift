@@ -31,7 +31,7 @@ final class AppContainer {
             .appendingPathComponent(".claude/projects", isDirectory: true)
         self.reader = UsageReader(rootDir: claudeRoot, store: store)
 
-        let bundled = Bundle.module.url(forResource: "pricing-fallback", withExtension: "json")
+        let bundled = Bundle.main.url(forResource: "pricing-fallback", withExtension: "json")
             .flatMap { try? Data(contentsOf: $0) } ?? Data("{}".utf8)
         self.pricingFetcher = PricingFetcher(
             cacheDir: cache,
