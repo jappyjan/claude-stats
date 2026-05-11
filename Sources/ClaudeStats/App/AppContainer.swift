@@ -8,6 +8,7 @@ final class AppContainer {
     let monitor: ActivityMonitor
     let pricingFetcher: PricingFetcher
     let viewModel: StatsViewModel
+    let updater: UpdaterController
 
     private var midnightTimer: Timer?
     private var pricingTimer: Timer?
@@ -51,6 +52,8 @@ final class AppContainer {
                 await viewModel.refresh()
             }
         }
+
+        self.updater = UpdaterController()
     }
 
     func rebuildIndex() async {
