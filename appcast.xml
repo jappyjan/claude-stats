@@ -7,12 +7,12 @@
     <language>en</language>
     <item>
       <title>v1.0.4</title>
-      <pubDate>2026-05-12T08:47:22Z</pubDate>
+      <pubDate>2026-05-12T08:54:38Z</pubDate>
       <sparkle:version>1.0.4</sparkle:version>
       <sparkle:shortVersionString>1.0.4</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:releaseNotesLink>https://github.com/jappyjan/claude-stats/releases/tag/v1.0.4</sparkle:releaseNotesLink>
-      <enclosure url="https://github.com/jappyjan/claude-stats/releases/download/v1.0.4/ClaudeStats.zip" sparkle:edSignature="AP68zINhan+TxR/1Wh7QPk6w3jeBYlFo4IGfE0gYCL/asE/G9MHc2lIfvB6V+8DI9dC5Kft0twk7+Y7DEw+MAQ==" length="1872456" type="application/octet-stream" />
+      <enclosure url="https://github.com/jappyjan/claude-stats/releases/download/v1.0.4/ClaudeStats.zip" sparkle:edSignature="6t7yxMq4cLbgwyeSUdH+ABpJ7X1ASaNz9sLULxM1ujDqoKG0Fup5gWEyQ9rHkfm6EfHwBob9+BI+ru+fBQg9CQ==" length="2890315" type="application/octet-stream" />
     </item>
   </channel>
 </rss>
