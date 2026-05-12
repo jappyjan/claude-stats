@@ -6,13 +6,13 @@
     <description>Most recent ClaudeStats release.</description>
     <language>en</language>
     <item>
-      <title>v1.0.4</title>
-      <pubDate>2026-05-12T08:54:38Z</pubDate>
-      <sparkle:version>1.0.4</sparkle:version>
-      <sparkle:shortVersionString>1.0.4</sparkle:shortVersionString>
+      <title>v1.0.5</title>
+      <pubDate>2026-05-12T08:57:50Z</pubDate>
+      <sparkle:version>1.0.5</sparkle:version>
+      <sparkle:shortVersionString>1.0.5</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/jappyjan/claude-stats/releases/tag/v1.0.4</sparkle:releaseNotesLink>
-      <enclosure url="https://github.com/jappyjan/claude-stats/releases/download/v1.0.4/ClaudeStats.zip" sparkle:edSignature="6t7yxMq4cLbgwyeSUdH+ABpJ7X1ASaNz9sLULxM1ujDqoKG0Fup5gWEyQ9rHkfm6EfHwBob9+BI+ru+fBQg9CQ==" length="2890315" type="application/octet-stream" />
+      <sparkle:releaseNotesLink>https://github.com/jappyjan/claude-stats/releases/tag/v1.0.5</sparkle:releaseNotesLink>
+      <enclosure url="https://github.com/jappyjan/claude-stats/releases/download/v1.0.5/ClaudeStats.zip" sparkle:edSignature="iHUHWxp4HQlTCX8XTMdoRUp/wec/SpYnWWcOOPPq5A0/WmvdWF20jgFGzJ0aSYI1toN3ka6MFoBMbYIo8vZdBA==" length="2890313" type="application/octet-stream" />
     </item>
   </channel>
 </rss>
