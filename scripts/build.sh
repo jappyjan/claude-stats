@@ -19,6 +19,10 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/claude-stats "$APP/Contents/MacOS/ClaudeStats"
 cp Sources/ClaudeStats/Info.plist "$APP/Contents/Info.plist"
 
+# Add Frameworks/ to the runtime search path so dyld resolves Sparkle.framework
+# (whose install name is @rpath/Sparkle.framework/...) from Contents/Frameworks/.
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/ClaudeStats"
+
 # Inject the version into the .app's Info.plist so Sparkle and the popover
 # both see the same number.
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
@@ -26,6 +30,11 @@ cp Sources/ClaudeStats/Info.plist "$APP/Contents/Info.plist"
 
 # 2. Copy pricing-fallback.json directly into Resources/ so Bundle.main finds it.
 cp Sources/ClaudeStats/Resources/pricing-fallback.json "$APP/Contents/Resources/"
+
+# 2a. Embed Sparkle.framework so dyld resolves @rpath/Sparkle.framework/... at
+#     launch. Without this, the app crashes immediately with "Library not loaded".
+mkdir -p "$APP/Contents/Frameworks"
+cp -R .build/release/Sparkle.framework "$APP/Contents/Frameworks/"
 
 # 3. Generate AppIcon.icns from assets/icon.png and bundle it.
 ICON_SRC="assets/icon.png"
