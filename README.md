@@ -27,6 +27,9 @@ The app stores aggregations in `~/Library/Application Support/claude-stats/usage
 
 ## Updates
 
+Auto-update first shipped in v1.0.4 — earlier installs need a one-time
+manual upgrade to start receiving prompts.
+
 The app checks for new releases once a day via [Sparkle](https://sparkle-project.org/).
 When a new version is available, you'll see a prompt with release notes and
 an Install button. You can disable automatic checks from
