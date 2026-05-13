@@ -41,7 +41,24 @@ final class AppContainer {
         )
 
         let initialPricing = (try? PricingTable.fromJSON(bundled)) ?? PricingTable(rates: [:])
-        self.viewModel = StatsViewModel(store: store, pricing: initialPricing)
+
+        let planLimitsBundled = Bundle.main.url(forResource: "plan-limits", withExtension: "json")
+            .flatMap { try? Data(contentsOf: $0) } ?? Data()
+        let calibrationURL = appSupport.appendingPathComponent("plan-calibration.json")
+        let catalog = (try? PlanCatalog(bundledData: planLimitsBundled, calibrationURL: calibrationURL))
+            ?? (try! PlanCatalog(bundledData: Data("""
+                {"pro":{"five_hour":{"tokens":250000},"seven_day":null},"max_5x":{"five_hour":{"tokens":1250000},"seven_day":{"tokens":15000000}},"max_20x":{"five_hour":{"tokens":5000000},"seven_day":{"tokens":60000000}}}
+                """.utf8), calibrationURL: calibrationURL))
+        let keychain = KeychainReader()
+        self.viewModel = StatsViewModel(
+            store: store,
+            pricing: initialPricing,
+            calculator: UsageWindowCalculator(store: store),
+            catalog: catalog,
+            detector: PlanDetector(keychain: keychain),
+            calibrator: PlanCalibrator(fileURL: calibrationURL),
+            apiClient: LimitsAPIClient(keychain: keychain)
+        )
 
         let monitor = ActivityMonitor(reader: reader, watchPath: claudeRoot.path)
         self.monitor = monitor
