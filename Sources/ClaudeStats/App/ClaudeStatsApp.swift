@@ -21,7 +21,7 @@ struct ClaudeStatsApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        Window("ClaudeStats Settings", id: "settings") {
+        SwiftUI.Window("ClaudeStats Settings", id: "settings") {
             SettingsView(container: container)
         }
         .windowResizability(.contentSize)
