@@ -9,6 +9,8 @@ final class AppContainer {
     let pricingFetcher: PricingFetcher
     let viewModel: StatsViewModel
     let updater: UpdaterController
+    let catalog: PlanCatalog
+    let detector: PlanDetector
 
     private var midnightTimer: Timer?
     private var pricingTimer: Timer?
@@ -45,17 +47,18 @@ final class AppContainer {
         let planLimitsBundled = Bundle.main.url(forResource: "plan-limits", withExtension: "json")
             .flatMap { try? Data(contentsOf: $0) } ?? Data()
         let calibrationURL = appSupport.appendingPathComponent("plan-calibration.json")
-        let catalog = (try? PlanCatalog(bundledData: planLimitsBundled, calibrationURL: calibrationURL))
+        self.catalog = (try? PlanCatalog(bundledData: planLimitsBundled, calibrationURL: calibrationURL))
             ?? (try! PlanCatalog(bundledData: Data("""
                 {"pro":{"five_hour":{"tokens":250000},"seven_day":null},"max_5x":{"five_hour":{"tokens":1250000},"seven_day":{"tokens":15000000}},"max_20x":{"five_hour":{"tokens":5000000},"seven_day":{"tokens":60000000}}}
                 """.utf8), calibrationURL: calibrationURL))
         let keychain = KeychainReader()
+        self.detector = PlanDetector(keychain: keychain)
         self.viewModel = StatsViewModel(
             store: store,
             pricing: initialPricing,
             calculator: UsageWindowCalculator(store: store),
             catalog: catalog,
-            detector: PlanDetector(keychain: keychain),
+            detector: detector,
             calibrator: PlanCalibrator(fileURL: calibrationURL),
             apiClient: LimitsAPIClient(keychain: keychain)
         )
@@ -71,6 +74,11 @@ final class AppContainer {
         }
 
         self.updater = UpdaterController()
+    }
+
+    var detectedPlanLabel: String {
+        guard let tier = detector.detect().tier else { return "" }
+        return tier.displayName
     }
 
     func rebuildIndex() async {
