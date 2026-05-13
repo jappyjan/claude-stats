@@ -43,7 +43,7 @@ final class AppContainer {
         let initialPricing = (try? PricingTable.fromJSON(bundled)) ?? PricingTable(rates: [:])
         self.viewModel = StatsViewModel(store: store, pricing: initialPricing)
 
-        let monitor = ActivityMonitor(reader: reader)
+        let monitor = ActivityMonitor(reader: reader, watchPath: claudeRoot.path)
         self.monitor = monitor
         monitor.onTick = { [weak viewModel, weak monitor] in
             guard let viewModel = viewModel, let monitor = monitor else { return }
