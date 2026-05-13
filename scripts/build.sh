@@ -30,6 +30,7 @@ install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/Mac
 
 # 2. Copy pricing-fallback.json directly into Resources/ so Bundle.main finds it.
 cp Sources/ClaudeStats/Resources/pricing-fallback.json "$APP/Contents/Resources/"
+cp Sources/ClaudeStats/Resources/plan-limits.json "$APP/Contents/Resources/"
 
 # 2a. Embed Sparkle.framework so dyld resolves @rpath/Sparkle.framework/... at
 #     launch. Without this, the app crashes immediately with "Library not loaded".
