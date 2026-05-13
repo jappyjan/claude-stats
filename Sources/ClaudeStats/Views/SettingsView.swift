@@ -36,14 +36,13 @@ struct SettingsView: View {
                         .onChange(of: useAPI) { _, newValue in
                             if newValue {
                                 Task {
-                                    await container.viewModel.refresh()
-                                    if let err = container.viewModel.limits.apiError {
-                                        await MainActor.run {
-                                            apiAlertMessage = err
-                                            useAPI = false
-                                        }
+                                    if let err = await container.viewModel.fetchAPILimitsNow() {
+                                        apiAlertMessage = err
+                                        useAPI = false
                                     }
                                 }
+                            } else {
+                                container.viewModel.clearAPIError()
                             }
                         }
                     if useAPI {

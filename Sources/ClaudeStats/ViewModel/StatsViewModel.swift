@@ -158,6 +158,30 @@ final class StatsViewModel {
         }
     }
 
+    /// Used by Settings to give the user immediate feedback when they
+    /// toggle API mode on. Bypasses the 60s throttle and surfaces any
+    /// error directly to the caller. Sets `lastAPIFetch` so subsequent
+    /// FSEvents-triggered refresh calls respect the cooldown.
+    func fetchAPILimitsNow() async -> String? {
+        let now = Date()
+        lastAPIFetch = now
+        do {
+            let response = try await apiClient.fetchUsage()
+            applyAPIResponse(response, now: now)
+            return nil
+        } catch {
+            let message = String(describing: error)
+            limits.apiError = message
+            return message
+        }
+    }
+
+    /// Clears any persisted API error. Called when the user turns API
+    /// mode off so the UI doesn't keep showing a stale "?" indicator.
+    func clearAPIError() {
+        limits.apiError = nil
+    }
+
     func projectDetail(for projectKey: String) async -> ProjectDetail? {
         let now = Date()
         let cal = Calendar.current
@@ -227,11 +251,14 @@ final class StatsViewModel {
     }
 
     /// Non-blocking. Kicks off an API fetch if opt-in is enabled, ≥60s
-    /// since last fetch, and not already in flight.
+    /// since last fetch, and not already in flight. The 60s throttle
+    /// applies to attempts, not just successes, so a persistent failure
+    /// doesn't hammer the endpoint on every FSEvents tick.
     private func maybeFetchAPILimits(now: Date) {
         guard useAPI, !inFlightAPIFetch else { return }
         if let last = lastAPIFetch, now.timeIntervalSince(last) < 60 { return }
         inFlightAPIFetch = true
+        lastAPIFetch = now
         let client = apiClient
         Task { @MainActor [weak self] in
             defer { self?.inFlightAPIFetch = false }
@@ -282,7 +309,6 @@ final class StatsViewModel {
         limits = LimitsState(plan: plan, windows: merged,
                               lastAPIRefresh: now, apiError: nil,
                               calibrationSamples: samples)
-        lastAPIFetch = now
     }
 
     private func computeCost(byModel rows: [UsageStore.ModelRow]) -> Double {
