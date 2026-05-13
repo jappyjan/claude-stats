@@ -29,12 +29,13 @@ final class ActivityMonitor {
         }
         if watcher.start() {
             self.watcher = watcher
+            scheduleSafetyTimer()
         } else {
             // FSEvents creation failed — fall back to a 10s polling Timer,
-            // matching the previous behavior.
+            // matching the previous behavior. The 10s cadence already
+            // beats the 60s safety net, so we don't schedule both.
             schedulePollingTimer(interval: 10)
         }
-        scheduleSafetyTimer()
         tickNow()
     }
 
