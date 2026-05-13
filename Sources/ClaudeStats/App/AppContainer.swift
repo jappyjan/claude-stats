@@ -49,7 +49,7 @@ final class AppContainer {
         let calibrationURL = appSupport.appendingPathComponent("plan-calibration.json")
         self.catalog = (try? PlanCatalog(bundledData: planLimitsBundled, calibrationURL: calibrationURL))
             ?? (try! PlanCatalog(bundledData: Data("""
-                {"pro":{"five_hour":{"tokens":3500000},"seven_day":null},"max_5x":{"five_hour":{"tokens":17000000},"seven_day":{"tokens":490000000}},"max_20x":{"five_hour":{"tokens":67000000},"seven_day":{"tokens":1950000000}}}
+                {"pro":{"five_hour":{"tokens":25000000},"seven_day":null},"max_5x":{"five_hour":{"tokens":120000000},"seven_day":{"tokens":3500000000}},"max_20x":{"five_hour":{"tokens":480000000},"seven_day":{"tokens":14000000000}}}
                 """.utf8), calibrationURL: calibrationURL))
         let keychain = KeychainReader()
         self.detector = PlanDetector(keychain: keychain)
