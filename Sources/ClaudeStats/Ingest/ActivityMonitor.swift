@@ -9,6 +9,7 @@ final class ActivityMonitor {
 
     private var watcher: FSEventsWatcher?
     private var fallbackTimer: Timer?
+    private var scanInFlight = false
 
     var onTick: (() -> Void)?
 
@@ -47,9 +48,12 @@ final class ActivityMonitor {
     }
 
     func tickNow() {
+        guard !scanInFlight else { return }
+        scanInFlight = true
         Task.detached { [reader] in
             try? reader.scan()
             await MainActor.run { [weak self] in
+                self?.scanInFlight = false
                 self?.onTick?()
             }
         }
