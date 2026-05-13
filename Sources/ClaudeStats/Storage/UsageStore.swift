@@ -115,6 +115,20 @@ final class UsageStore: @unchecked Sendable {
         return Int(stmt.int(0))
     }
 
+    /// Tokens weighted for subscription-limit accounting. Matches Anthropic
+    /// API cost weighting: cache_read counts at 10% of full, other token
+    /// types at 100%. Use `totalTokens(start:end:)` for cost/overview
+    /// figures — the limit accounting needs a different denominator.
+    func limitTokens(start: Date, end: Date) throws -> Int {
+        let stmt = try db.prepare("""
+            SELECT COALESCE(SUM(input_tokens + output_tokens + cache_create_tokens + cache_read_tokens / 10), 0)
+            FROM usage_event WHERE timestamp BETWEEN ? AND ?
+        """)
+        stmt.bind(1, clampedTimestamp(start)).bind(2, clampedTimestamp(end))
+        _ = try stmt.step()
+        return Int(stmt.int(0))
+    }
+
     func tokenTotals(start: Date, end: Date) throws -> TokenTotals {
         let stmt = try db.prepare("""
             SELECT COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0),

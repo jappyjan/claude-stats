@@ -15,6 +15,19 @@ final class UsageWindowCalculatorTests: XCTestCase {
         )
     }
 
+    private func entryFull(
+        ts: TimeInterval,
+        input: Int = 0, output: Int = 0,
+        cacheCreate: Int = 0, cacheRead: Int = 0
+    ) -> UsageEntry {
+        UsageEntry(
+            timestamp: Date(timeIntervalSince1970: ts),
+            sessionId: "s", projectPath: "/p", model: "m",
+            inputTokens: input, outputTokens: output,
+            cacheCreationTokens: cacheCreate, cacheReadTokens: cacheRead
+        )
+    }
+
     func testFiveHourSumsLastFiveHours() throws {
         let store = try makeStore()
         let now = Date(timeIntervalSince1970: 1_000_000)
@@ -45,5 +58,18 @@ final class UsageWindowCalculatorTests: XCTestCase {
         let calc = UsageWindowCalculator(store: store)
         XCTAssertEqual(calc.tokens(in: .fiveHour, endingAt: Date()), 0)
         XCTAssertEqual(calc.tokens(in: .sevenDay, endingAt: Date()), 0)
+    }
+
+    func testCacheReadCountsAtTenPercent() throws {
+        let store = try makeStore()
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        try store.insert([
+            entryFull(ts: now.timeIntervalSince1970 - 3600,
+                      input: 100, output: 200,
+                      cacheCreate: 50, cacheRead: 1000)
+        ])
+        let calc = UsageWindowCalculator(store: store)
+        // Expected: 100 + 200 + 50 + (1000 / 10) = 450.
+        XCTAssertEqual(calc.tokens(in: .fiveHour, endingAt: now), 450)
     }
 }
