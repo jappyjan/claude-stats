@@ -14,6 +14,7 @@ struct PopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             statusRow
+            LimitsBar(state: viewModel.limits)
             if drillProjectKey == nil {
                 sectionTabs
                 TimeRangeTabs(selection: $viewModel.timeRange)
