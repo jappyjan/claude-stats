@@ -29,7 +29,7 @@ final class PlanCatalogTests: XCTestCase {
         let url = tempURL()
         let calibration = """
         {
-          "max_5x": { "five_hour": { "samples": [], "calibratedLimit": 1300000 } }
+          "max_5x": { "five_hour": { "calibratedLimit": 1300000 } }
         }
         """
         try calibration.write(to: url, atomically: true, encoding: .utf8)
@@ -46,7 +46,7 @@ final class PlanCatalogTests: XCTestCase {
         XCTAssertEqual(catalog.limit(plan: .max_5x, window: .fiveHour)?.tokens, 1_250_000)
 
         try """
-        {"max_5x": {"five_hour": {"samples": [], "calibratedLimit": 1400000}}}
+        {"max_5x": {"five_hour": {"calibratedLimit": 1400000}}}
         """.write(to: url, atomically: true, encoding: .utf8)
         catalog.reloadCalibration()
         XCTAssertEqual(catalog.limit(plan: .max_5x, window: .fiveHour)?.tokens, 1_400_000)

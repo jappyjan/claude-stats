@@ -23,6 +23,11 @@ private struct CalibrationFile: Decodable {
     }
 }
 
+/// Per-plan limit lookup. Loads bundled fallback values and overlays
+/// them with the user's calibration file if one exists.
+///
+/// Not thread-safe. All reads and writes must happen on the same
+/// actor — in this app, that's the main actor via `StatsViewModel`.
 final class PlanCatalog {
     private let bundled: BundledLimits
     private let calibrationURL: URL
