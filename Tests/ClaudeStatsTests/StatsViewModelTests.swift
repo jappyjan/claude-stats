@@ -185,4 +185,44 @@ final class StatsViewModelTests: XCTestCase {
         XCTAssertEqual(vm.yearSummary.months[1].estimatedCost, 0.5, accuracy: 1e-6)
         XCTAssertEqual(vm.yearSummary.months[2].estimatedCost, 0.0, accuracy: 1e-6)
     }
+
+    func testMonthDetailTopProjectsLimitedToFive() async throws {
+        let cal = Calendar.current
+        func mkDate(_ year: Int, _ month: Int, _ day: Int = 15) -> Date {
+            cal.date(from: DateComponents(year: year, month: month, day: day, hour: 12))!
+        }
+        var events: [UsageEntry] = []
+        for i in 0..<8 {
+            events.append(UsageEntry(
+                timestamp: mkDate(2026, 1, i + 1),
+                sessionId: "s\(i)",
+                projectPath: "/p\(i)",
+                model: "m",
+                inputTokens: 100 * (10 - i),  // /p0 = 1000, /p1 = 900, ... /p7 = 300
+                outputTokens: 0,
+                cacheCreationTokens: 0,
+                cacheReadTokens: 0
+            ))
+        }
+        let store = try makeStore(events: events)
+        let vm = makeViewModel(store: store, pricing: PricingTable(rates: [:]))
+        vm.monthsYear = 2026
+        vm.refreshYearSummary()
+        let detail = await vm.monthDetail(year: 2026, month: 1)
+        XCTAssertNotNil(detail)
+        XCTAssertEqual(detail?.topProjects.count, 5)
+        XCTAssertEqual(detail?.topProjects.first?.projectKey, "/p0")
+        XCTAssertEqual(detail?.topProjects.first?.totalTokens, 1000)
+        XCTAssertEqual(detail?.projectCount, 8)
+        XCTAssertEqual(detail?.sessionCount, 8)
+    }
+
+    func testMonthDetailNilForWrongYear() async throws {
+        let store = try makeStore(events: [])
+        let vm = makeViewModel(store: store, pricing: PricingTable(rates: [:]))
+        vm.monthsYear = 2026
+        vm.refreshYearSummary()
+        let detail = await vm.monthDetail(year: 2024, month: 1)
+        XCTAssertNil(detail)
+    }
 }

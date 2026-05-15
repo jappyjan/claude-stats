@@ -288,6 +288,40 @@ final class StatsViewModel {
         }
     }
 
+    /// Builds a `MonthDetail` for the given (year, month). Totals/byModel/cost
+    /// come from the cached `MonthBucket` for that month in `yearSummary`;
+    /// session count and per-project rows come from a per-month store query.
+    /// Returns nil if the month falls outside the cached year or on store error.
+    func monthDetail(year: Int, month: Int) async -> MonthDetail? {
+        guard yearSummary.year == year,
+              let bucket = yearSummary.months.first(where: { $0.month == month })
+        else { return nil }
+        let cal = Calendar.current
+        var startComps = DateComponents()
+        startComps.year = year
+        startComps.month = month
+        startComps.day = 1
+        startComps.timeZone = cal.timeZone
+        guard let monthStart = cal.date(from: startComps),
+              let monthEnd = cal.date(byAdding: .month, value: 1, to: monthStart)
+        else { return nil }
+        do {
+            let projects = try store.tokensByProject(start: monthStart, end: monthEnd)
+            let sessions = try store.sessionCount(start: monthStart, end: monthEnd)
+            return MonthDetail(
+                year: year, month: month,
+                totalTokens: bucket.totalTokens,
+                estimatedCost: bucket.estimatedCost,
+                sessionCount: sessions,
+                projectCount: projects.count,
+                byModel: bucket.byModel,
+                topProjects: Array(projects.prefix(5))
+            )
+        } catch {
+            return nil
+        }
+    }
+
     /// User-facing settings read from UserDefaults each call so toggle changes
     /// in SettingsView take effect on the next refresh.
     private var useAPI: Bool {
