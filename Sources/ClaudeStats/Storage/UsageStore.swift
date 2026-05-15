@@ -316,6 +316,18 @@ final class UsageStore: @unchecked Sendable {
         }
     }
 
+    /// Earliest timestamp across all events, or nil if the table is empty.
+    /// Used to determine the earliest year of data for the Months tab's
+    /// year stepper bound.
+    func earliestTimestamp() throws -> Date? {
+        try queue.sync {
+            let stmt = try db.prepare("SELECT MIN(timestamp) FROM usage_event")
+            _ = try stmt.step()
+            let value = stmt.int(0)
+            return value == 0 ? nil : Date(timeIntervalSince1970: TimeInterval(value))
+        }
+    }
+
     func earliestTimestamp(start: Date, end: Date) throws -> Date? {
         try queue.sync {
             let stmt = try db.prepare("""

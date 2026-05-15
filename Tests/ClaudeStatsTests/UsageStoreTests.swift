@@ -196,4 +196,16 @@ final class UsageStoreTests: XCTestCase {
         let rowsIn2025 = try store.tokensByMonthAndModel(year: 2025, calendar: cal)
         XCTAssertTrue(rowsIn2025.isEmpty)
     }
+
+    func testEarliestTimestampNoArgs() throws {
+        let store = try makeStore()
+        XCTAssertNil(try store.earliestTimestamp())
+        try store.insert([
+            entry(ts: 5_000, input: 1),
+            entry(ts: 1_000, input: 1),
+            entry(ts: 3_000, input: 1),
+        ])
+        let earliest = try store.earliestTimestamp()
+        XCTAssertEqual(earliest, Date(timeIntervalSince1970: 1_000))
+    }
 }
