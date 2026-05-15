@@ -45,22 +45,11 @@ subscription window you've consumed:
   plans.
 - **7d** — the rolling 7-day cap on Max plans only.
 
-Your plan is auto-detected from Claude Code's Keychain entry, or you
-can override it in **Settings → Limits**. By default the bar uses local
-JSONL data compared against documented plan limits — the numbers are
-approximations.
-
-Toggle **Settings → Use Anthropic API for real numbers** to switch to
-the same `/api/oauth/usage` endpoint Claude Code's `/usage` command
-uses. The first time you enable this, macOS will prompt you to grant
-Keychain access for the Claude Code credentials item. Once enabled,
-the app also begins calibrating its bundled fallback limits against the
-real numbers — so even if you later turn the toggle off, your local
-estimates become more accurate over time.
-
-Note: calibration uses tokens from this Mac only. If you also use
-Claude Code on other machines under the same account, the local
-estimate may read low.
+Pick your plan in **Settings → Limits** (Pro / Max 5x / Max 20x); the
+bar stays hidden until you do. Numbers are derived from local JSONL
+data compared against documented plan limits, so they're
+approximations. If you also use Claude Code on other machines under
+the same account, the local estimate may read low.
 
 ## Pricing
 

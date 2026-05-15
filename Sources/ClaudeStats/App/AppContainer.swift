@@ -10,13 +10,14 @@ final class AppContainer {
     let viewModel: StatsViewModel
     let updater: UpdaterController
     let catalog: PlanCatalog
-    let detector: PlanDetector
 
     private var midnightTimer: Timer?
     private var pricingTimer: Timer?
     private var wakeObserver: NSObjectProtocol?
 
     init() {
+        Self.migrateLegacyDefaults()
+
         let appSupport = try! FileManager.default.url(
             for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
         ).appendingPathComponent("claude-stats", isDirectory: true)
@@ -46,21 +47,15 @@ final class AppContainer {
 
         let planLimitsBundled = Bundle.main.url(forResource: "plan-limits", withExtension: "json")
             .flatMap { try? Data(contentsOf: $0) } ?? Data()
-        let calibrationURL = appSupport.appendingPathComponent("plan-calibration.json")
-        self.catalog = (try? PlanCatalog(bundledData: planLimitsBundled, calibrationURL: calibrationURL))
+        self.catalog = (try? PlanCatalog(bundledData: planLimitsBundled))
             ?? (try! PlanCatalog(bundledData: Data("""
                 {"pro":{"five_hour":{"tokens":25000000},"seven_day":null},"max_5x":{"five_hour":{"tokens":120000000},"seven_day":{"tokens":3500000000}},"max_20x":{"five_hour":{"tokens":480000000},"seven_day":{"tokens":14000000000}}}
-                """.utf8), calibrationURL: calibrationURL))
-        let keychain = KeychainReader()
-        self.detector = PlanDetector(keychain: keychain)
+                """.utf8)))
         self.viewModel = StatsViewModel(
             store: store,
             pricing: initialPricing,
             calculator: UsageWindowCalculator(store: store),
-            catalog: catalog,
-            detector: detector,
-            calibrator: PlanCalibrator(fileURL: calibrationURL),
-            apiClient: LimitsAPIClient(keychain: keychain)
+            catalog: catalog
         )
 
         let monitor = ActivityMonitor(reader: reader, watchPath: claudeRoot.path)
@@ -76,9 +71,16 @@ final class AppContainer {
         self.updater = UpdaterController()
     }
 
-    var detectedPlanLabel: String {
-        guard let tier = detector.detect().tier else { return "" }
-        return tier.displayName
+    /// One-shot cleanup of UserDefaults keys that the v2 keychain/auto-detect
+    /// path used. Old installs may have `planOverride = "auto"` or a stale
+    /// `useUsageAPI` flag; the new picker only understands `none` plus
+    /// `PlanTier` raw values.
+    private static func migrateLegacyDefaults() {
+        let defaults = UserDefaults.standard
+        if defaults.string(forKey: "planOverride") == "auto" {
+            defaults.set("none", forKey: "planOverride")
+        }
+        defaults.removeObject(forKey: "useUsageAPI")
     }
 
     func rebuildIndex() async {

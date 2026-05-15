@@ -2,21 +2,15 @@ import Foundation
 import Observation
 
 struct LimitsWindowProgress: Equatable {
-    enum Source: String, Equatable { case local, api }
     let window: Window
     let used: Int
     let limit: Int
     let percent: Double
-    let resetsAt: Date?
-    let source: Source
 }
 
 struct LimitsState: Equatable {
     var plan: PlanTier?
     var windows: [LimitsWindowProgress]
-    var lastAPIRefresh: Date?
-    var apiError: String?
-    var calibrationSamples: [Window: Int]
 }
 
 @Observable
@@ -76,9 +70,6 @@ final class StatsViewModel {
     // Limits subsystem.
     private let calculator: UsageWindowCalculator
     private let catalog: PlanCatalog
-    private let detector: PlanDetector
-    private let calibrator: PlanCalibrator
-    private let apiClient: LimitsAPIClient
 
     var timeRange: TimeRange = .today
     var todayTokens: Int = 0
@@ -86,8 +77,7 @@ final class StatsViewModel {
     var overview: Overview = .init()
     var projectRows: [UsageStore.ProjectRow] = []
     var projectCosts: [String: Double] = [:]
-    var limits: LimitsState = .init(plan: nil, windows: [], lastAPIRefresh: nil,
-                                     apiError: nil, calibrationSamples: [:])
+    var limits: LimitsState = .init(plan: nil, windows: [])
     var monthsYear: Int = Calendar.current.component(.year, from: Date())
     var yearSummary: YearSummary = YearSummary(
         year: Calendar.current.component(.year, from: Date()),
@@ -96,23 +86,14 @@ final class StatsViewModel {
         monthsWithData: 0
     )
 
-    private var lastAPIFetch: Date?
-    private var inFlightAPIFetch: Bool = false
-
     init(store: UsageStore,
          pricing: PricingTable,
          calculator: UsageWindowCalculator,
-         catalog: PlanCatalog,
-         detector: PlanDetector,
-         calibrator: PlanCalibrator,
-         apiClient: LimitsAPIClient) {
+         catalog: PlanCatalog) {
         self.store = store
         self.pricing = pricing
         self.calculator = calculator
         self.catalog = catalog
-        self.detector = detector
-        self.calibrator = calibrator
-        self.apiClient = apiClient
     }
 
     func update(pricing: PricingTable) {
@@ -185,35 +166,10 @@ final class StatsViewModel {
             projectCosts = nextProjectCosts
             overview = nextOverview
             recomputeLocalLimits(now: now)
-            maybeFetchAPILimits(now: now)
             refreshYearSummary()
         } catch {
             // Leave previous state on error; surfaced via logging when wired.
         }
-    }
-
-    /// Used by Settings to give the user immediate feedback when they
-    /// toggle API mode on. Bypasses the 60s throttle and surfaces any
-    /// error directly to the caller. Sets `lastAPIFetch` so subsequent
-    /// FSEvents-triggered refresh calls respect the cooldown.
-    func fetchAPILimitsNow() async -> String? {
-        let now = Date()
-        lastAPIFetch = now
-        do {
-            let response = try await apiClient.fetchUsage()
-            applyAPIResponse(response, now: now)
-            return nil
-        } catch {
-            let message = String(describing: error)
-            limits.apiError = message
-            return message
-        }
-    }
-
-    /// Clears any persisted API error. Called when the user turns API
-    /// mode off so the UI doesn't keep showing a stale "?" indicator.
-    func clearAPIError() {
-        limits.apiError = nil
     }
 
     func projectDetail(for projectKey: String) async -> ProjectDetail? {
@@ -477,31 +433,18 @@ final class StatsViewModel {
         )
     }
 
-    /// User-facing settings read from UserDefaults each call so toggle changes
-    /// in SettingsView take effect on the next refresh.
-    private var useAPI: Bool {
-        UserDefaults.standard.bool(forKey: "useUsageAPI")
-    }
-
+    /// Read from UserDefaults each call so the Settings picker takes effect on
+    /// the next refresh.
     private var planOverride: PlanTier? {
-        guard let raw = UserDefaults.standard.string(forKey: "planOverride"),
-              raw != "auto" else { return nil }
+        guard let raw = UserDefaults.standard.string(forKey: "planOverride") else {
+            return nil
+        }
         return PlanTier(rawValue: raw)
     }
 
-    private func effectivePlan() -> PlanTier? {
-        if let override = planOverride { return override }
-        return detector.detect().tier
-    }
-
-    /// Always runs (purely local computation). Cheap.
     private func recomputeLocalLimits(now: Date) {
-        let plan = effectivePlan()
-        guard let plan else {
-            limits = LimitsState(plan: nil, windows: [],
-                                  lastAPIRefresh: limits.lastAPIRefresh,
-                                  apiError: limits.apiError,
-                                  calibrationSamples: limits.calibrationSamples)
+        guard let plan = planOverride else {
+            limits = LimitsState(plan: nil, windows: [])
             return
         }
         var windows: [LimitsWindowProgress] = []
@@ -511,78 +454,10 @@ final class StatsViewModel {
             let pct = lim.tokens == 0 ? 0 : Double(used) / Double(lim.tokens)
             windows.append(.init(
                 window: w, used: used, limit: lim.tokens,
-                percent: min(pct, 1.0), resetsAt: nil, source: .local
+                percent: min(pct, 1.0)
             ))
         }
-        var samples: [Window: Int] = [:]
-        for w in Window.allCases {
-            samples[w] = calibrator.sampleCount(plan: plan, window: w)
-        }
-        limits = LimitsState(plan: plan, windows: windows,
-                              lastAPIRefresh: limits.lastAPIRefresh,
-                              apiError: limits.apiError,
-                              calibrationSamples: samples)
-    }
-
-    /// Non-blocking. Kicks off an API fetch if opt-in is enabled, ≥60s
-    /// since last fetch, and not already in flight. The 60s throttle
-    /// applies to attempts, not just successes, so a persistent failure
-    /// doesn't hammer the endpoint on every FSEvents tick.
-    private func maybeFetchAPILimits(now: Date) {
-        guard useAPI, !inFlightAPIFetch else { return }
-        if let last = lastAPIFetch, now.timeIntervalSince(last) < 60 { return }
-        inFlightAPIFetch = true
-        lastAPIFetch = now
-        let client = apiClient
-        Task { @MainActor [weak self] in
-            defer { self?.inFlightAPIFetch = false }
-            do {
-                let response = try await client.fetchUsage()
-                self?.applyAPIResponse(response, now: now)
-            } catch {
-                self?.limits.apiError = String(describing: error)
-            }
-        }
-    }
-
-    private func applyAPIResponse(_ response: APIRateLimits, now: Date) {
-        guard let plan = effectivePlan() else { return }
-        var merged = limits.windows
-        let apiWindows: [(Window, APIRateLimits.Window)] = [
-            (.fiveHour, response.five_hour),
-            (.sevenDay, response.seven_day)
-        ].compactMap { (w, payload) in
-            payload.map { (w, $0) }
-        }
-        for (window, payload) in apiWindows {
-            let localTokens = calculator.tokens(in: window, endingAt: now)
-            // Calibrate before reading the limit.
-            calibrator.record(plan: plan, window: window,
-                               localTokens: localTokens,
-                               utilization: payload.utilization, now: now)
-            catalog.reloadCalibration()
-            // Use the (possibly newly calibrated) limit, treat API utilization as authoritative.
-            let limit = catalog.limit(plan: plan, window: window)?.tokens ?? 0
-            let used = limit > 0 ? Int(Double(limit) * payload.utilization / 100.0) : localTokens
-            let pct = min(max(payload.utilization / 100.0, 0), 1)
-            let resetsAt = Date(timeIntervalSince1970: TimeInterval(payload.resets_at))
-            let progress = LimitsWindowProgress(
-                window: window, used: used, limit: limit,
-                percent: pct, resetsAt: resetsAt, source: .api
-            )
-            if let idx = merged.firstIndex(where: { $0.window == window }) {
-                merged[idx] = progress
-            } else {
-                merged.append(progress)
-            }
-        }
-        var samples: [Window: Int] = [:]
-        for w in Window.allCases {
-            samples[w] = calibrator.sampleCount(plan: plan, window: w)
-        }
-        limits = LimitsState(plan: plan, windows: merged,
-                              lastAPIRefresh: now, apiError: nil,
-                              calibrationSamples: samples)
+        limits = LimitsState(plan: plan, windows: windows)
     }
 
     private func computeCost(byModel rows: [UsageStore.ModelRow]) -> Double {

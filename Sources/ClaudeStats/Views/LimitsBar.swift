@@ -21,12 +21,6 @@ struct LimitsBar: View {
             ForEach(state.windows, id: \.window) { w in
                 segment(for: w)
             }
-            if state.apiError != nil {
-                Image(systemName: "questionmark.circle")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .help(state.apiError ?? "")
-            }
         }
         .frame(maxWidth: .infinity)
     }
@@ -81,14 +75,7 @@ struct LimitsBar: View {
     private func tooltip(for w: LimitsWindowProgress) -> String {
         let usedStr = format(tokens: w.used)
         let limitStr = format(tokens: w.limit)
-        var parts: [String] = ["\(usedStr) / \(limitStr) tokens"]
-        if let r = w.resetsAt {
-            let formatter = RelativeDateTimeFormatter()
-            formatter.unitsStyle = .abbreviated
-            parts.append("resets \(formatter.localizedString(for: r, relativeTo: Date()))")
-        }
-        if w.source == .api { parts.append("from API") }
-        return parts.joined(separator: " · ")
+        return "\(usedStr) / \(limitStr) tokens"
     }
 
     private func format(tokens n: Int) -> String {

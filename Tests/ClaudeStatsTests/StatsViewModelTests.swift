@@ -18,22 +18,12 @@ final class StatsViewModelTests: XCTestCase {
           "max_20x": {"five_hour": {"tokens": 480000000}, "seven_day": {"tokens": 14000000000}}
         }
         """.utf8)
-        let calibURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("svm-\(UUID().uuidString).json")
-        let catalog = try! PlanCatalog(bundledData: bundled, calibrationURL: calibURL)
+        let catalog = try! PlanCatalog(bundledData: bundled)
         return StatsViewModel(
             store: store, pricing: pricing,
             calculator: UsageWindowCalculator(store: store),
-            catalog: catalog,
-            detector: PlanDetector(keychain: NoOpKeychain()),
-            calibrator: PlanCalibrator(fileURL: calibURL),
-            apiClient: LimitsAPIClient(keychain: NoOpKeychain())
+            catalog: catalog
         )
-    }
-
-    private final class NoOpKeychain: KeychainReading {
-        func readClaudeCredentials() throws -> ClaudeCredentials? { nil }
-        func writeClaudeCredentials(_ creds: ClaudeCredentials) throws {}
     }
 
     private func entry(secondsAgo: Int, model: String = "claude-opus-4-7", project: String = "/p1",
