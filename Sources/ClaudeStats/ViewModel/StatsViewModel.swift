@@ -186,6 +186,7 @@ final class StatsViewModel {
             overview = nextOverview
             recomputeLocalLimits(now: now)
             maybeFetchAPILimits(now: now)
+            refreshYearSummary()
         } catch {
             // Leave previous state on error; surfaced via logging when wired.
         }
@@ -233,6 +234,57 @@ final class StatsViewModel {
             )
         } catch {
             return nil
+        }
+    }
+
+    /// Recomputes `yearSummary` for the current `monthsYear` using the
+    /// configured store and pricing table. Always produces 12 month
+    /// entries (Jan first), zero-filling months with no data. Cost per
+    /// month is computed at call time from `pricing`, so a pricing
+    /// refresh propagates on the next call.
+    func refreshYearSummary() {
+        let year = monthsYear
+        let cal = Calendar.current
+        do {
+            let rows = try store.tokensByMonthAndModel(year: year, calendar: cal)
+            let earliest = try store.earliestTimestamp()
+            let earliestYear = earliest.map { cal.component(.year, from: $0) }
+
+            var byMonth: [Int: [UsageStore.ModelRow]] = [:]
+            for r in rows {
+                let modelRow = UsageStore.ModelRow(
+                    model: r.model,
+                    totalTokens: r.tokens.total,
+                    inputTokens: r.tokens.input,
+                    outputTokens: r.tokens.output,
+                    cacheCreateTokens: r.tokens.cacheCreate,
+                    cacheReadTokens: r.tokens.cacheRead
+                )
+                byMonth[r.month, default: []].append(modelRow)
+            }
+
+            var buckets: [MonthBucket] = []
+            for month in 1...12 {
+                let models = (byMonth[month] ?? [])
+                    .sorted { $0.totalTokens > $1.totalTokens }
+                let totalTokens = models.reduce(0) { $0 + $1.totalTokens }
+                let cost = computeCost(byModel: models)
+                buckets.append(MonthBucket(
+                    year: year, month: month,
+                    totalTokens: totalTokens,
+                    estimatedCost: cost,
+                    byModel: models
+                ))
+            }
+            let monthsWithData = buckets.filter { $0.totalTokens > 0 }.count
+            yearSummary = YearSummary(
+                year: year,
+                months: buckets,
+                earliestYearWithData: earliestYear,
+                monthsWithData: monthsWithData
+            )
+        } catch {
+            // Leave previous state on error.
         }
     }
 

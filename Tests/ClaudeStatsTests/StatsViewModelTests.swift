@@ -93,4 +93,96 @@ final class StatsViewModelTests: XCTestCase {
         // hit rate = cacheRead / (input + cacheCreate + cacheRead) = 200 / 400 = 0.5
         XCTAssertEqual(vm.overview.cacheHitRate, 0.5, accuracy: 1e-9)
     }
+
+    func testRefreshYearSummaryYields12Entries() async throws {
+        let cal = Calendar.current
+        func mkDate(_ year: Int, _ month: Int, _ day: Int = 15, _ hour: Int = 12) -> Date {
+            cal.date(from: DateComponents(year: year, month: month, day: day, hour: hour))!
+        }
+        let store = try makeStore(events: [
+            UsageEntry(timestamp: mkDate(2026, 1), sessionId: "s", projectPath: "/p",
+                       model: "claude-opus-4-7", inputTokens: 100, outputTokens: 50,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 3), sessionId: "s", projectPath: "/p",
+                       model: "claude-opus-4-7", inputTokens: 200, outputTokens: 100,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+        ])
+        let vm = makeViewModel(store: store, pricing: PricingTable(rates: [:]))
+        vm.monthsYear = 2026
+        vm.refreshYearSummary()
+        XCTAssertEqual(vm.yearSummary.months.count, 12)
+        XCTAssertEqual(vm.yearSummary.year, 2026)
+        XCTAssertEqual(vm.yearSummary.months[0].month, 1)
+        XCTAssertEqual(vm.yearSummary.months[0].totalTokens, 150)
+        XCTAssertEqual(vm.yearSummary.months[1].month, 2)
+        XCTAssertEqual(vm.yearSummary.months[1].totalTokens, 0)
+        XCTAssertEqual(vm.yearSummary.months[2].month, 3)
+        XCTAssertEqual(vm.yearSummary.months[2].totalTokens, 300)
+    }
+
+    func testRefreshYearSummaryCountsMonthsWithData() async throws {
+        let cal = Calendar.current
+        func mkDate(_ year: Int, _ month: Int) -> Date {
+            cal.date(from: DateComponents(year: year, month: month, day: 15, hour: 12))!
+        }
+        let store = try makeStore(events: [
+            UsageEntry(timestamp: mkDate(2026, 1), sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 10, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 4), sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 10, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 11), sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 10, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+        ])
+        let vm = makeViewModel(store: store, pricing: PricingTable(rates: [:]))
+        vm.monthsYear = 2026
+        vm.refreshYearSummary()
+        XCTAssertEqual(vm.yearSummary.monthsWithData, 3)
+    }
+
+    func testRefreshYearSummaryEarliestYearWithData() async throws {
+        let cal = Calendar.current
+        func mkDate(_ year: Int, _ month: Int) -> Date {
+            cal.date(from: DateComponents(year: year, month: month, day: 15, hour: 12))!
+        }
+        let store = try makeStore(events: [
+            UsageEntry(timestamp: mkDate(2024, 7), sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 1, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 1), sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 1, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+        ])
+        let vm = makeViewModel(store: store, pricing: PricingTable(rates: [:]))
+        vm.monthsYear = 2026
+        vm.refreshYearSummary()
+        XCTAssertEqual(vm.yearSummary.earliestYearWithData, 2024)
+    }
+
+    func testRefreshYearSummaryAppliesPricingPerMonth() async throws {
+        let cal = Calendar.current
+        func mkDate(_ year: Int, _ month: Int) -> Date {
+            cal.date(from: DateComponents(year: year, month: month, day: 15, hour: 12))!
+        }
+        let store = try makeStore(events: [
+            UsageEntry(timestamp: mkDate(2026, 1), sessionId: "s", projectPath: "/p",
+                       model: "m1", inputTokens: 1_000_000, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 2), sessionId: "s", projectPath: "/p",
+                       model: "m1", inputTokens: 500_000, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+        ])
+        // $1 per million input tokens for m1.
+        let pricing = PricingTable(rates: [
+            "m1": PricingTable.Rate(input: 1e-6, output: 0, cacheCreate: 0, cacheRead: 0)
+        ])
+        let vm = makeViewModel(store: store, pricing: pricing)
+        vm.monthsYear = 2026
+        vm.refreshYearSummary()
+        XCTAssertEqual(vm.yearSummary.months[0].estimatedCost, 1.0, accuracy: 1e-6)
+        XCTAssertEqual(vm.yearSummary.months[1].estimatedCost, 0.5, accuracy: 1e-6)
+        XCTAssertEqual(vm.yearSummary.months[2].estimatedCost, 0.0, accuracy: 1e-6)
+    }
 }
