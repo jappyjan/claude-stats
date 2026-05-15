@@ -208,4 +208,66 @@ final class UsageStoreTests: XCTestCase {
         let earliest = try store.earliestTimestamp()
         XCTAssertEqual(earliest, Date(timeIntervalSince1970: 1_000))
     }
+
+    func testTokensByMonthProjectModelGroups() throws {
+        let store = try makeStore()
+        let cal = Calendar.current
+        func mkDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 12) -> Date {
+            cal.date(from: DateComponents(year: year, month: month, day: day, hour: hour))!
+        }
+        try store.insert([
+            UsageEntry(timestamp: mkDate(2026, 1, 10), sessionId: "s", projectPath: "/p1",
+                       model: "claude-opus-4-7", inputTokens: 100, outputTokens: 50,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 1, 20), sessionId: "s", projectPath: "/p1",
+                       model: "claude-opus-4-7", inputTokens: 30, outputTokens: 10,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 1, 25), sessionId: "s", projectPath: "/p2",
+                       model: "claude-sonnet-4-6", inputTokens: 5, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 3, 1), sessionId: "s", projectPath: "/p1",
+                       model: "claude-opus-4-7", inputTokens: 200, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+        ])
+        let start = mkDate(2026, 1, 1, 0)
+        let end = mkDate(2027, 1, 1, 0)
+        let rows = try store.tokensByMonthProjectModel(start: start, end: end, calendar: cal)
+        XCTAssertEqual(rows.count, 3)
+        let janP1Opus = rows.first { $0.year == 2026 && $0.month == 1 && $0.projectKey == "/p1" && $0.model == "claude-opus-4-7" }
+        XCTAssertEqual(janP1Opus?.tokens.input, 130)
+        XCTAssertEqual(janP1Opus?.tokens.output, 60)
+        let janP2Sonnet = rows.first { $0.year == 2026 && $0.month == 1 && $0.projectKey == "/p2" && $0.model == "claude-sonnet-4-6" }
+        XCTAssertEqual(janP2Sonnet?.tokens.input, 5)
+        let marP1Opus = rows.first { $0.year == 2026 && $0.month == 3 && $0.projectKey == "/p1" && $0.model == "claude-opus-4-7" }
+        XCTAssertEqual(marP1Opus?.tokens.input, 200)
+    }
+
+    func testTokensByMonthProjectModelExcludesOutOfRange() throws {
+        let store = try makeStore()
+        let cal = Calendar.current
+        func mkDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 12) -> Date {
+            cal.date(from: DateComponents(year: year, month: month, day: day, hour: hour))!
+        }
+        try store.insert([
+            UsageEntry(timestamp: mkDate(2026, 1, 14, 23), sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 1, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 1, 15, 1), sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 2, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 5, 15, 23), sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 4, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 5, 16, 1), sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 8, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+        ])
+        // Range: 2026-01-15 00:00 (inclusive) to 2026-05-16 00:00 (exclusive).
+        let start = mkDate(2026, 1, 15, 0)
+        let end = mkDate(2026, 5, 16, 0)
+        let rows = try store.tokensByMonthProjectModel(start: start, end: end, calendar: cal)
+        // Should include the Jan 15 01:00 event (input=2) and May 15 23:00 event (input=4); exclude the others.
+        let totalInput = rows.reduce(0) { $0 + $1.tokens.input }
+        XCTAssertEqual(totalInput, 6)
+    }
 }

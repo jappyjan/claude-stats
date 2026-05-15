@@ -316,6 +316,48 @@ final class UsageStore: @unchecked Sendable {
         }
     }
 
+    /// Aggregate tokens per (year, month, project, model) within an arbitrary
+    /// day-bounded range. Year/month are bucketed in SQLite's local time zone
+    /// via `strftime`+`'localtime'` (matches process TZ + `Calendar.current`).
+    /// Returns rows ordered by (year, month, projectKey, model) ascending.
+    func tokensByMonthProjectModel(
+        start: Date, end: Date, calendar: Calendar
+    ) throws -> [(year: Int, month: Int, projectKey: String, model: String, tokens: TokenTotals)] {
+        _ = calendar  // calendar parameter retained for API symmetry; SQLite's localtime uses the process TZ.
+        return try queue.sync {
+            let stmt = try db.prepare("""
+                SELECT
+                  CAST(strftime('%Y', timestamp, 'unixepoch', 'localtime') AS INTEGER) AS y,
+                  CAST(strftime('%m', timestamp, 'unixepoch', 'localtime') AS INTEGER) AS m,
+                  project_key,
+                  model,
+                  SUM(input_tokens), SUM(output_tokens),
+                  SUM(cache_create_tokens), SUM(cache_read_tokens)
+                FROM usage_event
+                WHERE timestamp >= ? AND timestamp < ?
+                GROUP BY y, m, project_key, model
+                ORDER BY y, m, project_key, model
+            """)
+            stmt.bind(1, clampedTimestamp(start)).bind(2, clampedTimestamp(end))
+            var rows: [(year: Int, month: Int, projectKey: String, model: String, tokens: TokenTotals)] = []
+            while try stmt.step() {
+                rows.append((
+                    year: Int(stmt.int(0)),
+                    month: Int(stmt.int(1)),
+                    projectKey: stmt.string(2),
+                    model: stmt.string(3),
+                    tokens: TokenTotals(
+                        input: Int(stmt.int(4)),
+                        output: Int(stmt.int(5)),
+                        cacheCreate: Int(stmt.int(6)),
+                        cacheRead: Int(stmt.int(7))
+                    )
+                ))
+            }
+            return rows
+        }
+    }
+
     /// Earliest timestamp across all events, or nil if the table is empty.
     /// Used to determine the earliest year of data for the Months tab's
     /// year stepper bound.
