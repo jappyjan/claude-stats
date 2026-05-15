@@ -4,6 +4,7 @@ struct MonthsView: View {
     @Bindable var viewModel: StatsViewModel
     @Binding var breakdown: MonthsBreakdown
     let onSelectMonth: (Int, Int) -> Void  // (year, month)
+    @State private var showExportSheet = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -31,9 +32,18 @@ struct MonthsView: View {
                     }
                 }
             }
+            Divider()
+            footer
         }
         .onAppear { viewModel.refreshYearSummary() }
         .onChange(of: viewModel.monthsYear) { viewModel.refreshYearSummary() }
+        .sheet(isPresented: $showExportSheet) {
+            ExportSheet(
+                viewModel: viewModel,
+                initialYear: viewModel.monthsYear,
+                onDismiss: { showExportSheet = false }
+            )
+        }
     }
 
     private var breakdownPicker: some View {
@@ -131,9 +141,6 @@ struct MonthsView: View {
             .buttonStyle(.plain)
             .disabled(!canStepForward)
             Spacer()
-            Text("\(viewModel.yearSummary.monthsWithData) month\(viewModel.yearSummary.monthsWithData == 1 ? "" : "s") with data")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
@@ -154,6 +161,19 @@ struct MonthsView: View {
             Text("$\(String(format: "%.2f", yearCost))")
                 .font(.system(size: 12)).monospacedDigit().foregroundStyle(.secondary)
             Spacer()
+        }
+        .padding(.horizontal, 14).padding(.vertical, 6)
+    }
+
+    private var footer: some View {
+        HStack {
+            Text("\(viewModel.yearSummary.monthsWithData) month\(viewModel.yearSummary.monthsWithData == 1 ? "" : "s") with data")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Export…") { showExportSheet = true }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
         }
         .padding(.horizontal, 14).padding(.vertical, 6)
     }
