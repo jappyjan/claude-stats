@@ -4,7 +4,7 @@ struct MonthsView: View {
     @Bindable var viewModel: StatsViewModel
     @Binding var breakdown: MonthsBreakdown
     let onSelectMonth: (Int, Int) -> Void  // (year, month)
-    @State private var showExportSheet = false
+    let onExportTapped: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -37,13 +37,6 @@ struct MonthsView: View {
         }
         .onAppear { viewModel.refreshYearSummary() }
         .onChange(of: viewModel.monthsYear) { viewModel.refreshYearSummary() }
-        .sheet(isPresented: $showExportSheet) {
-            ExportSheet(
-                viewModel: viewModel,
-                initialYear: viewModel.monthsYear,
-                onDismiss: { showExportSheet = false }
-            )
-        }
     }
 
     private var breakdownPicker: some View {
@@ -171,7 +164,7 @@ struct MonthsView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             Spacer()
-            Button("Export…") { showExportSheet = true }
+            Button("Export…") { onExportTapped() }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
         }

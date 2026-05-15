@@ -9,6 +9,7 @@ struct PopoverView: View {
     @State private var drillDetail: StatsViewModel.ProjectDetail? = nil
     @State private var drillMonth: MonthSelection? = nil
     @State private var drillMonthDetail: StatsViewModel.MonthDetail? = nil
+    @State private var showExport: Bool = false
     @AppStorage("monthsBreakdown") private var monthsBreakdown: MonthsBreakdown = .total
     @Environment(\.openWindow) private var openWindow
 
@@ -23,7 +24,7 @@ struct PopoverView: View {
         VStack(alignment: .leading, spacing: 0) {
             statusRow
             LimitsBar(state: viewModel.limits)
-            if drillProjectKey == nil && drillMonth == nil {
+            if drillProjectKey == nil && drillMonth == nil && !showExport {
                 sectionTabs
                 if section != .months {
                     TimeRangeTabs(selection: $viewModel.timeRange)
@@ -49,10 +50,17 @@ struct PopoverView: View {
                             onSelectMonth: { year, month in
                                 drillMonth = MonthSelection(year: year, month: month)
                                 Task { drillMonthDetail = await viewModel.monthDetail(year: year, month: month) }
-                            }
+                            },
+                            onExportTapped: { showExport = true }
                         )
                     }
                 }
+            } else if showExport {
+                ExportSheet(
+                    viewModel: viewModel,
+                    initialYear: viewModel.monthsYear,
+                    onDismiss: { showExport = false }
+                )
             } else if let detail = drillDetail {
                 ProjectDetailView(detail: detail, range: viewModel.timeRange) {
                     drillProjectKey = nil; drillDetail = nil
