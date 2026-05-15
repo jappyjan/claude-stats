@@ -110,6 +110,61 @@ Projects are listed up to a limit of 5, by total tokens descending.
 "More projects" is not surfaced — the existing Projects tab covers that
 need.
 
+### Breakdown views (Total / Type / Model)
+
+A segmented control above the year stepper lets the user choose how
+each month is decomposed. The selection drives both the row bars in
+the month list AND the stat-card layout in the month detail view.
+
+```
+┌────────────────────────────────────────┐
+│  [ Total ] [ Type ] [ Model ]          │  ← segmented control
+├────────────────────────────────────────┤
+│  Type: ▓ input  ▓ output  ▓ cc  ▓ cr   │  ← legend (only in non-Total modes)
+├────────────────────────────────────────┤
+│  ◀   2026   ▶            5 with data   │  ← year stepper
+├─ … rest as before                       ┤
+```
+
+- **Total** (default). Current row design: single gradient bar (purple
+  → pink), total tokens, cost. Detail view stat cards are the existing
+  pair (Tokens + Cost).
+
+- **Type**. The row's bar is replaced by a **stacked horizontal bar**
+  with four segments (input, output, cache-create, cache-read), in
+  fixed colors. Each segment's width is proportional to its share of
+  the month's total. Right-side number stays as total tokens + cost.
+  A small color legend strip appears under the segmented control.
+  Detail view stat cards become a 2×2 grid showing Input / Output /
+  Cache-create / Cache-read counts (formatted with the same k/M helper),
+  with a single Cost row below.
+
+- **Model**. The row's bar is replaced by a **stacked horizontal bar**
+  with one segment per model, colored using the existing `ModelChip`
+  palette (Opus purple, Sonnet blue, Haiku green, other gray). Right-
+  side number stays as total tokens + cost. The legend strip lists the
+  models present in the visible year, each with its color swatch.
+  Detail view is unchanged from Total mode — the existing BY MODEL
+  list already covers per-model breakdown.
+
+**Empty / sparse months.** When the month total is zero, the stacked
+bar collapses to the same faint placeholder track as in Total mode
+(no segments visible). The row height stays consistent.
+
+**Color palette (Type mode):**
+- input: blue
+- output: green
+- cache-create: orange
+- cache-read: purple
+
+The same palette is used for the legend strip swatches.
+
+### Persistence
+
+The segmented-control selection is stored in `UserDefaults` under the
+key `monthsBreakdown` (raw value of the enum). On launch the popover
+reads the last-used mode; if unset, defaults to `.total`.
+
 ## Architecture
 
 ### `MonthBucket` (new value type)
