@@ -44,6 +44,32 @@ final class StatsViewModel {
         let recentSessions: [UsageStore.SessionRow]
     }
 
+    struct MonthBucket: Equatable {
+        let year: Int
+        let month: Int      // 1...12
+        let totalTokens: Int
+        let estimatedCost: Double
+        let byModel: [UsageStore.ModelRow]
+    }
+
+    struct YearSummary: Equatable {
+        let year: Int
+        let months: [MonthBucket]            // 12 entries, Jan first (zero-filled for sparse months)
+        let earliestYearWithData: Int?
+        let monthsWithData: Int
+    }
+
+    struct MonthDetail: Equatable {
+        let year: Int
+        let month: Int                       // 1...12
+        let totalTokens: Int
+        let estimatedCost: Double
+        let sessionCount: Int
+        let projectCount: Int
+        let byModel: [UsageStore.ModelRow]
+        let topProjects: [UsageStore.ProjectRow]  // up to 5
+    }
+
     private let store: UsageStore
     private(set) var pricing: PricingTable
 
@@ -62,6 +88,13 @@ final class StatsViewModel {
     var projectCosts: [String: Double] = [:]
     var limits: LimitsState = .init(plan: nil, windows: [], lastAPIRefresh: nil,
                                      apiError: nil, calibrationSamples: [:])
+    var monthsYear: Int = Calendar.current.component(.year, from: Date())
+    var yearSummary: YearSummary = YearSummary(
+        year: Calendar.current.component(.year, from: Date()),
+        months: [],
+        earliestYearWithData: nil,
+        monthsWithData: 0
+    )
 
     private var lastAPIFetch: Date?
     private var inFlightAPIFetch: Bool = false
