@@ -271,6 +271,51 @@ final class UsageStore: @unchecked Sendable {
         }
     }
 
+    /// Aggregate tokens per (month, model) for a single calendar year.
+    /// Months are bucketed in SQLite's local time zone via `strftime`+`'localtime'`,
+    /// which matches the process TZ (the same TZ `Calendar.current` uses).
+    /// Returns at most 12 × (# models) rows, ordered by month asc.
+    func tokensByMonthAndModel(year: Int, calendar: Calendar)
+        throws -> [(month: Int, model: String, tokens: TokenTotals)]
+    {
+        var startComps = DateComponents()
+        startComps.year = year
+        startComps.month = 1
+        startComps.day = 1
+        startComps.timeZone = calendar.timeZone
+        guard let start = calendar.date(from: startComps),
+              let end = calendar.date(byAdding: .year, value: 1, to: start)
+        else { return [] }
+        return try queue.sync {
+            let stmt = try db.prepare("""
+                SELECT
+                  CAST(strftime('%m', timestamp, 'unixepoch', 'localtime') AS INTEGER) AS month,
+                  model,
+                  SUM(input_tokens), SUM(output_tokens),
+                  SUM(cache_create_tokens), SUM(cache_read_tokens)
+                FROM usage_event
+                WHERE timestamp >= ? AND timestamp < ?
+                GROUP BY month, model
+                ORDER BY month
+            """)
+            stmt.bind(1, clampedTimestamp(start)).bind(2, clampedTimestamp(end))
+            var rows: [(month: Int, model: String, tokens: TokenTotals)] = []
+            while try stmt.step() {
+                rows.append((
+                    month: Int(stmt.int(0)),
+                    model: stmt.string(1),
+                    tokens: TokenTotals(
+                        input: Int(stmt.int(2)),
+                        output: Int(stmt.int(3)),
+                        cacheCreate: Int(stmt.int(4)),
+                        cacheRead: Int(stmt.int(5))
+                    )
+                ))
+            }
+            return rows
+        }
+    }
+
     func earliestTimestamp(start: Date, end: Date) throws -> Date? {
         try queue.sync {
             let stmt = try db.prepare("""

@@ -120,4 +120,80 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(result[day2Midnight], 7)
         XCTAssertEqual(result.count, 2)
     }
+
+    func testTokensByMonthAndModelGroupsByMonth() throws {
+        let store = try makeStore()
+        let cal = Calendar.current
+        func mkDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 12) -> Date {
+            cal.date(from: DateComponents(year: year, month: month, day: day, hour: hour))!
+        }
+        try store.insert([
+            UsageEntry(timestamp: mkDate(2026, 1, 10), sessionId: "s", projectPath: "/p",
+                       model: "claude-opus-4-7", inputTokens: 100, outputTokens: 50,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 1, 20), sessionId: "s", projectPath: "/p",
+                       model: "claude-sonnet-4-6", inputTokens: 30, outputTokens: 10,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 3, 5), sessionId: "s", projectPath: "/p",
+                       model: "claude-opus-4-7", inputTokens: 200, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+        ])
+        let rows = try store.tokensByMonthAndModel(year: 2026, calendar: cal)
+        XCTAssertEqual(rows.count, 3)
+        let janOpus = rows.first { $0.month == 1 && $0.model == "claude-opus-4-7" }
+        XCTAssertEqual(janOpus?.tokens.input, 100)
+        XCTAssertEqual(janOpus?.tokens.output, 50)
+        let janSonnet = rows.first { $0.month == 1 && $0.model == "claude-sonnet-4-6" }
+        XCTAssertEqual(janSonnet?.tokens.input, 30)
+        let marOpus = rows.first { $0.month == 3 && $0.model == "claude-opus-4-7" }
+        XCTAssertEqual(marOpus?.tokens.input, 200)
+    }
+
+    func testTokensByMonthAndModelEmptyYearReturnsEmpty() throws {
+        let store = try makeStore()
+        let cal = Calendar.current
+        let rows = try store.tokensByMonthAndModel(year: 2026, calendar: cal)
+        XCTAssertTrue(rows.isEmpty)
+    }
+
+    func testTokensByMonthAndModelExcludesOtherYears() throws {
+        let store = try makeStore()
+        let cal = Calendar.current
+        func mkDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 12) -> Date {
+            cal.date(from: DateComponents(year: year, month: month, day: day, hour: hour))!
+        }
+        try store.insert([
+            UsageEntry(timestamp: mkDate(2025, 12, 31, 23), sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 999, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 6, 15), sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 100, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2027, 1, 1, 1), sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 888, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+        ])
+        let rows = try store.tokensByMonthAndModel(year: 2026, calendar: cal)
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows[0].month, 6)
+        XCTAssertEqual(rows[0].tokens.input, 100)
+    }
+
+    func testTokensByMonthAndModelLocalTimeBoundary() throws {
+        let store = try makeStore()
+        let cal = Calendar.current
+        // 2026-01-01 00:30 in the local TZ (whatever the process TZ is).
+        let jan1Local = cal.date(from: DateComponents(year: 2026, month: 1, day: 1, hour: 0, minute: 30))!
+        try store.insert([
+            UsageEntry(timestamp: jan1Local, sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 42, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0)
+        ])
+        let rowsIn2026 = try store.tokensByMonthAndModel(year: 2026, calendar: cal)
+        XCTAssertEqual(rowsIn2026.count, 1)
+        XCTAssertEqual(rowsIn2026[0].month, 1)
+        XCTAssertEqual(rowsIn2026[0].tokens.input, 42)
+        let rowsIn2025 = try store.tokensByMonthAndModel(year: 2025, calendar: cal)
+        XCTAssertTrue(rowsIn2025.isEmpty)
+    }
 }
