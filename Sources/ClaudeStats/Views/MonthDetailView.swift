@@ -112,15 +112,19 @@ struct MonthDetailView: View {
         return (input, output, cc, cr)
     }
 
+    private static let titleFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "LLLL yyyy"
+        return f
+    }()
+
     private var title: String {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "LLLL yyyy"
         var comps = DateComponents()
         comps.year = detail.year
         comps.month = detail.month
         comps.day = 1
         if let date = Calendar.current.date(from: comps) {
-            return fmt.string(from: date)
+            return MonthDetailView.titleFormatter.string(from: date)
         }
         return "\(detail.month)/\(detail.year)"
     }

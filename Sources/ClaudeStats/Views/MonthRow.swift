@@ -96,15 +96,19 @@ struct MonthRow: View {
         return .gray
     }
 
+    private static let monthFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "LLL"
+        return f
+    }()
+
     private var monthLabel: String {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "LLL"
         var comps = DateComponents()
         comps.year = bucket.year
         comps.month = bucket.month
         comps.day = 1
         if let date = Calendar.current.date(from: comps) {
-            return fmt.string(from: date)
+            return MonthRow.monthFormatter.string(from: date)
         }
         return "\(bucket.month)"
     }

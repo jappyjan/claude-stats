@@ -140,8 +140,9 @@ struct MonthsView: View {
     }
 
     private var headerSummary: some View {
-        let yearTotal = viewModel.yearSummary.months.reduce(0) { $0 + $1.totalTokens }
-        let yearCost = viewModel.yearSummary.months.reduce(0.0) { $0 + $1.estimatedCost }
+        let visible = displayBuckets
+        let yearTotal = visible.reduce(0) { $0 + $1.totalTokens }
+        let yearCost = visible.reduce(0.0) { $0 + $1.estimatedCost }
         return HStack {
             Text("\(viewModel.monthsYear, format: .number.grouping(.never))")
                 .font(.system(size: 12, weight: .semibold))
