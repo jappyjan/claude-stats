@@ -12,7 +12,9 @@ final class UsageStoreTests: XCTestCase {
         model: String = "claude-opus-4-7",
         input: Int = 100, output: Int = 0,
         cacheCreate: Int = 0, cacheRead: Int = 0,
-        session: String = "s1"
+        session: String = "s1",
+        messageId: String? = nil,
+        requestId: String? = nil
     ) -> UsageEntry {
         UsageEntry(
             timestamp: Date(timeIntervalSince1970: ts),
@@ -20,7 +22,9 @@ final class UsageStoreTests: XCTestCase {
             projectPath: project,
             model: model,
             inputTokens: input, outputTokens: output,
-            cacheCreationTokens: cacheCreate, cacheReadTokens: cacheRead
+            cacheCreationTokens: cacheCreate, cacheReadTokens: cacheRead,
+            messageId: messageId,
+            requestId: requestId
         )
     }
 
@@ -240,6 +244,118 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(janP2Sonnet?.tokens.input, 5)
         let marP1Opus = rows.first { $0.year == 2026 && $0.month == 3 && $0.projectKey == "/p1" && $0.model == "claude-opus-4-7" }
         XCTAssertEqual(marP1Opus?.tokens.input, 200)
+    }
+
+    func testInsertDedupesOnMessageIdAndRequestId() throws {
+        // Same (messageId, requestId) — even with different tokens or timestamps —
+        // is the same logical event written twice by Claude Code. Keep the first.
+        let store = try makeStore()
+        try store.insert([
+            entry(ts: 1000, input: 100, messageId: "msg_a", requestId: "req_1"),
+            entry(ts: 1100, input: 999, messageId: "msg_a", requestId: "req_1"),
+        ])
+        let total = try store.totalTokens(start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 9999))
+        XCTAssertEqual(total, 100)
+    }
+
+    func testInsertKeepsDistinctMessageIds() throws {
+        let store = try makeStore()
+        try store.insert([
+            entry(ts: 1000, input: 10, messageId: "msg_a", requestId: "req_1"),
+            entry(ts: 1100, input: 20, messageId: "msg_b", requestId: "req_1"),
+        ])
+        let total = try store.totalTokens(start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 9999))
+        XCTAssertEqual(total, 30)
+    }
+
+    func testInsertDoesNotDedupeWhenIdsMissing() throws {
+        // ccusage skips dedup when either key is missing; we match that — counting
+        // both is the safer failure mode (legacy entries shouldn't vanish).
+        let store = try makeStore()
+        try store.insert([
+            entry(ts: 1000, input: 5),
+            entry(ts: 1100, input: 7),
+        ])
+        let total = try store.totalTokens(start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 9999))
+        XCTAssertEqual(total, 12)
+    }
+
+    func testInsertDedupesAcrossSeparateInsertCalls() throws {
+        let store = try makeStore()
+        try store.insert([entry(ts: 1000, input: 100, messageId: "msg_a", requestId: "req_1")])
+        try store.insert([entry(ts: 1100, input: 999, messageId: "msg_a", requestId: "req_1")])
+        let total = try store.totalTokens(start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 9999))
+        XCTAssertEqual(total, 100)
+    }
+
+    private func seedLegacyV0DB(at path: String) throws {
+        // Helper scopes the SQLite connection so its deinit closes the handle
+        // before the test re-opens it (WAL mode otherwise reports "database
+        // table is locked").
+        let legacy = try SQLite(path: path)
+        try legacy.exec("""
+            CREATE TABLE usage_event (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp INTEGER NOT NULL,
+                session_id TEXT NOT NULL,
+                project_path TEXT NOT NULL,
+                project_key TEXT NOT NULL,
+                model TEXT NOT NULL,
+                input_tokens INTEGER NOT NULL,
+                output_tokens INTEGER NOT NULL,
+                cache_create_tokens INTEGER NOT NULL,
+                cache_read_tokens INTEGER NOT NULL
+            );
+            CREATE TABLE file_state (
+                path TEXT PRIMARY KEY,
+                mtime INTEGER NOT NULL,
+                last_offset INTEGER NOT NULL,
+                last_scanned_at INTEGER NOT NULL
+            );
+            INSERT INTO usage_event (timestamp, session_id, project_path, project_key, model,
+                input_tokens, output_tokens, cache_create_tokens, cache_read_tokens)
+                VALUES (1000, 's', '/p', '/p', 'm', 100, 100, 100, 100);
+            INSERT INTO file_state (path, mtime, last_offset, last_scanned_at)
+                VALUES ('/some.jsonl', 1, 999, 1);
+        """)
+        _ = legacy  // silence unused warning; deinit fires on function return.
+    }
+
+    private func seedV2DB(at path: String) throws {
+        let store = try UsageStore(path: path)
+        try store.insert([entry(ts: 1000, input: 42, messageId: "msg_keep", requestId: "req_keep")])
+    }
+
+    func testOpeningLegacyV0SchemaWipesDataAndFileState() throws {
+        // Seed a v0-shaped DB (no message_id/request_id columns, no user_version).
+        // Existing rows are already double-counted, so the new code must wipe and
+        // force a full rescan from offset 0 by also clearing file_state.
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("legacy-\(UUID().uuidString).db")
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        try seedLegacyV0DB(at: tmp.path)
+
+        let store = try UsageStore(path: tmp.path)
+        let total = try store.totalTokens(
+            start: Date(timeIntervalSince1970: 0),
+            end: Date(timeIntervalSince1970: 9999)
+        )
+        XCTAssertEqual(total, 0, "legacy double-counted rows must be wiped on migration")
+        XCTAssertNil(try store.fileState(path: "/some.jsonl"),
+                     "file_state must be cleared so the reader rescans from offset 0")
+    }
+
+    func testOpeningCurrentSchemaPreservesData() throws {
+        // Once we've migrated to v2, subsequent opens must NOT wipe data —
+        // otherwise we'd nuke the DB on every app launch.
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("v2-\(UUID().uuidString).db")
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        try seedV2DB(at: tmp.path)
+        let store = try UsageStore(path: tmp.path)
+        let total = try store.totalTokens(
+            start: Date(timeIntervalSince1970: 0),
+            end: Date(timeIntervalSince1970: 9999)
+        )
+        XCTAssertEqual(total, 42)
     }
 
     func testTokensByMonthProjectModelExcludesOutOfRange() throws {

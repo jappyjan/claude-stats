@@ -22,6 +22,10 @@ final class UsageReaderTests: XCTestCase {
         #"{"type":"assistant","message":{"model":"\#(model)","role":"assistant","usage":{"input_tokens":1,"output_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}},"timestamp":"\#(ts)","sessionId":"s","cwd":"/p"}"#
     }
 
+    private func dedupableLine(model: String, ts: String, msg: String, req: String, tokens: Int = 1) -> String {
+        #"{"type":"assistant","requestId":"\#(req)","message":{"id":"\#(msg)","model":"\#(model)","role":"assistant","usage":{"input_tokens":\#(tokens),"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}},"timestamp":"\#(ts)","sessionId":"s","cwd":"/p"}"#
+    }
+
     func testInitialScanInsertsAllAssistantLines() throws {
         _ = try write("proj-a/sess1.jsonl", [validLine(model: "m1", ts: "2026-05-10T10:00:00.000Z")])
         _ = try write("proj-a/sess1/subagents/agent-x.jsonl", [validLine(model: "m2", ts: "2026-05-10T10:01:00.000Z")])
@@ -55,6 +59,24 @@ final class UsageReaderTests: XCTestCase {
         let after = try store.fileState(path: url.path)?.lastOffset
         XCTAssertEqual(before, after)
         XCTAssertEqual(try store.totalTokens(start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: .greatestFiniteMagnitude)), 2)
+    }
+
+    func testSameAssistantEventInTwoFilesIsCountedOnce() throws {
+        // Claude Code writes the same usage event to multiple JSONL files
+        // (subagent forks, session resumes). Dedup by (messageId, requestId)
+        // happens in UsageStore; verify the end-to-end pipeline honors it.
+        let line = dedupableLine(model: "m", ts: "2026-05-10T10:00:00.000Z",
+                                 msg: "msg_same", req: "req_same", tokens: 100)
+        _ = try write("proj-a/sess1.jsonl", [line])
+        _ = try write("proj-a/sess1/subagents/agent-x.jsonl", [line])
+        let store = try UsageStore(path: ":memory:")
+        let reader = UsageReader(rootDir: tmp, store: store)
+        try reader.scan()
+        XCTAssertEqual(
+            try store.totalTokens(start: Date(timeIntervalSince1970: 0),
+                                  end: Date(timeIntervalSince1970: .greatestFiniteMagnitude)),
+            100
+        )
     }
 
     func testActiveIfFileMtimeWithinThreshold() throws {

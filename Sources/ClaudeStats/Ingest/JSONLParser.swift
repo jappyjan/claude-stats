@@ -60,7 +60,9 @@ struct JSONLParser {
             inputTokens: (usage["input_tokens"] as? Int) ?? 0,
             outputTokens: (usage["output_tokens"] as? Int) ?? 0,
             cacheCreationTokens: (usage["cache_creation_input_tokens"] as? Int) ?? 0,
-            cacheReadTokens: (usage["cache_read_input_tokens"] as? Int) ?? 0
+            cacheReadTokens: (usage["cache_read_input_tokens"] as? Int) ?? 0,
+            messageId: message["id"] as? String,
+            requestId: obj["requestId"] as? String
         )
     }
 }
