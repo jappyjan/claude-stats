@@ -322,6 +322,154 @@ final class StatsViewModel {
         }
     }
 
+    /// Helper for the export sheet's "All time" preset. Returns nil if the
+    /// store has no events.
+    func earliestEventDate() -> Date? {
+        (try? store.earliestTimestamp())
+    }
+
+    /// Materialises an `ExportData` for the day-bounded range [start, end).
+    /// Pricing is applied at call time from the current `PricingTable`.
+    func buildExportData(start: Date, end: Date) async throws -> ExportData {
+        let cal = Calendar.current
+        let raw = try store.tokensByMonthProjectModel(start: start, end: end, calendar: cal)
+
+        var csvRows: [ExportData.CSVRow] = []
+        csvRows.reserveCapacity(raw.count)
+        for r in raw {
+            let total = r.tokens.total
+            let cost = pricing.cost(
+                model: r.model,
+                input: r.tokens.input,
+                output: r.tokens.output,
+                cacheCreate: r.tokens.cacheCreate,
+                cacheRead: r.tokens.cacheRead
+            ) ?? 0
+            csvRows.append(ExportData.CSVRow(
+                year: r.year, month: r.month,
+                projectKey: r.projectKey, model: r.model,
+                inputTokens: r.tokens.input,
+                outputTokens: r.tokens.output,
+                cacheCreateTokens: r.tokens.cacheCreate,
+                cacheReadTokens: r.tokens.cacheRead,
+                totalTokens: total,
+                estimatedCost: cost
+            ))
+        }
+
+        // Group raw rows by (year, month) for buckets and by model for overall.
+        var rowsByMonth: [String: [(projectKey: String, model: String, tokens: UsageStore.TokenTotals)]] = [:]
+        var modelTotals: [String: UsageStore.TokenTotals] = [:]
+        for r in raw {
+            let key = "\(r.year)-\(r.month)"
+            rowsByMonth[key, default: []].append((r.projectKey, r.model, r.tokens))
+            let cur = modelTotals[r.model] ?? UsageStore.TokenTotals(input: 0, output: 0, cacheCreate: 0, cacheRead: 0)
+            modelTotals[r.model] = UsageStore.TokenTotals(
+                input: cur.input + r.tokens.input,
+                output: cur.output + r.tokens.output,
+                cacheCreate: cur.cacheCreate + r.tokens.cacheCreate,
+                cacheRead: cur.cacheRead + r.tokens.cacheRead
+            )
+        }
+
+        // Build MonthBuckets in chronological order. For each month, derive
+        // sessionCount and topProjects from the store, clipped to the
+        // intersection of (month bounds, requested range).
+        var buckets: [ExportData.MonthBucket] = []
+        var seenMonths: Set<Int64> = []
+        var uniqueMonths: [(year: Int, month: Int)] = []
+        for r in raw {
+            let key = Int64(r.year) * 100 + Int64(r.month)
+            if seenMonths.insert(key).inserted {
+                uniqueMonths.append((year: r.year, month: r.month))
+            }
+        }
+        uniqueMonths.sort { ($0.year, $0.month) < ($1.year, $1.month) }
+        for ym in uniqueMonths {
+            var startComps = DateComponents()
+            startComps.year = ym.year
+            startComps.month = ym.month
+            startComps.day = 1
+            startComps.timeZone = cal.timeZone
+            guard let monthStart = cal.date(from: startComps),
+                  let monthEnd = cal.date(byAdding: .month, value: 1, to: monthStart)
+            else { continue }
+            let lo = max(start, monthStart)
+            let hi = min(end, monthEnd)
+            let sessions = try store.sessionCount(start: lo, end: hi)
+            let projects = try store.tokensByProject(start: lo, end: hi)
+
+            // ByModel for this month (sorted desc by total).
+            let monthRaw = rowsByMonth["\(ym.year)-\(ym.month)"] ?? []
+            var byModelMap: [String: UsageStore.TokenTotals] = [:]
+            for entry in monthRaw {
+                let cur = byModelMap[entry.model] ?? UsageStore.TokenTotals(input: 0, output: 0, cacheCreate: 0, cacheRead: 0)
+                byModelMap[entry.model] = UsageStore.TokenTotals(
+                    input: cur.input + entry.tokens.input,
+                    output: cur.output + entry.tokens.output,
+                    cacheCreate: cur.cacheCreate + entry.tokens.cacheCreate,
+                    cacheRead: cur.cacheRead + entry.tokens.cacheRead
+                )
+            }
+            let byModel: [UsageStore.ModelRow] = byModelMap.map { model, t in
+                UsageStore.ModelRow(
+                    model: model,
+                    totalTokens: t.total,
+                    inputTokens: t.input,
+                    outputTokens: t.output,
+                    cacheCreateTokens: t.cacheCreate,
+                    cacheReadTokens: t.cacheRead
+                )
+            }.sorted { $0.totalTokens > $1.totalTokens }
+            let totalTokens = byModel.reduce(0) { $0 + $1.totalTokens }
+            let cost = byModel.reduce(0.0) { acc, row in
+                acc + (pricing.cost(
+                    model: row.model,
+                    input: row.inputTokens,
+                    output: row.outputTokens,
+                    cacheCreate: row.cacheCreateTokens,
+                    cacheRead: row.cacheReadTokens
+                ) ?? 0)
+            }
+            buckets.append(ExportData.MonthBucket(
+                year: ym.year, month: ym.month,
+                totalTokens: totalTokens,
+                estimatedCost: cost,
+                sessionCount: sessions,
+                projectCount: projects.count,
+                byModel: byModel,
+                topProjects: Array(projects.prefix(5))
+            ))
+        }
+
+        // Range-wide totals.
+        let totalTokens = buckets.reduce(0) { $0 + $1.totalTokens }
+        let totalCost = buckets.reduce(0.0) { $0 + $1.estimatedCost }
+        let sessionCount = try store.sessionCount(start: start, end: end)
+        let allProjects = try store.tokensByProject(start: start, end: end)
+        let byModelOverall: [UsageStore.ModelRow] = modelTotals.map { model, t in
+            UsageStore.ModelRow(
+                model: model,
+                totalTokens: t.total,
+                inputTokens: t.input,
+                outputTokens: t.output,
+                cacheCreateTokens: t.cacheCreate,
+                cacheReadTokens: t.cacheRead
+            )
+        }.sorted { $0.totalTokens > $1.totalTokens }
+
+        return ExportData(
+            start: start, end: end,
+            totalTokens: totalTokens,
+            estimatedCost: totalCost,
+            sessionCount: sessionCount,
+            projectCount: allProjects.count,
+            byModelOverall: byModelOverall,
+            months: buckets,
+            csvRows: csvRows
+        )
+    }
+
     /// User-facing settings read from UserDefaults each call so toggle changes
     /// in SettingsView take effect on the next refresh.
     private var useAPI: Bool {

@@ -225,4 +225,89 @@ final class StatsViewModelTests: XCTestCase {
         let detail = await vm.monthDetail(year: 2024, month: 1)
         XCTAssertNil(detail)
     }
+
+    func testBuildExportDataTotalsAndBuckets() async throws {
+        let cal = Calendar.current
+        func mkDate(_ year: Int, _ month: Int, _ day: Int = 15, _ hour: Int = 12) -> Date {
+            cal.date(from: DateComponents(year: year, month: month, day: day, hour: hour))!
+        }
+        let store = try makeStore(events: [
+            UsageEntry(timestamp: mkDate(2026, 1), sessionId: "s1", projectPath: "/p1",
+                       model: "m1", inputTokens: 1_000_000, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 2), sessionId: "s2", projectPath: "/p2",
+                       model: "m1", inputTokens: 500_000, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 2), sessionId: "s2", projectPath: "/p2",
+                       model: "m2", inputTokens: 250_000, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+        ])
+        // $1 per million input tokens for m1; $2/M for m2.
+        let pricing = PricingTable(rates: [
+            "m1": PricingTable.Rate(input: 1e-6, output: 0, cacheCreate: 0, cacheRead: 0),
+            "m2": PricingTable.Rate(input: 2e-6, output: 0, cacheCreate: 0, cacheRead: 0),
+        ])
+        let vm = makeViewModel(store: store, pricing: pricing)
+        let start = mkDate(2026, 1, 1, 0)
+        let end = mkDate(2026, 3, 1, 0)
+        let data = try await vm.buildExportData(start: start, end: end)
+        XCTAssertEqual(data.totalTokens, 1_750_000)
+        XCTAssertEqual(data.estimatedCost, 2.0, accuracy: 1e-6)
+        XCTAssertEqual(data.sessionCount, 2)
+        XCTAssertEqual(data.projectCount, 2)
+        XCTAssertEqual(data.months.count, 2)
+        XCTAssertEqual(data.months[0].month, 1)
+        XCTAssertEqual(data.months[0].totalTokens, 1_000_000)
+        XCTAssertEqual(data.months[1].month, 2)
+        XCTAssertEqual(data.months[1].totalTokens, 750_000)
+    }
+
+    func testBuildExportDataCSVRowsAreSorted() async throws {
+        let cal = Calendar.current
+        func mkDate(_ year: Int, _ month: Int, _ day: Int = 15) -> Date {
+            cal.date(from: DateComponents(year: year, month: month, day: day, hour: 12))!
+        }
+        let store = try makeStore(events: [
+            // Intentionally out-of-order inserts to confirm the ORDER BY in SQL.
+            UsageEntry(timestamp: mkDate(2026, 3), sessionId: "s", projectPath: "/zzz",
+                       model: "m", inputTokens: 1, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 1), sessionId: "s", projectPath: "/aaa",
+                       model: "m", inputTokens: 1, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 1), sessionId: "s", projectPath: "/zzz",
+                       model: "m", inputTokens: 1, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+        ])
+        let vm = makeViewModel(store: store, pricing: PricingTable(rates: [:]))
+        let data = try await vm.buildExportData(start: mkDate(2026, 1, 1), end: mkDate(2027, 1, 1))
+        XCTAssertEqual(data.csvRows.count, 3)
+        XCTAssertEqual(data.csvRows[0].month, 1)
+        XCTAssertEqual(data.csvRows[0].projectKey, "/aaa")
+        XCTAssertEqual(data.csvRows[1].month, 1)
+        XCTAssertEqual(data.csvRows[1].projectKey, "/zzz")
+        XCTAssertEqual(data.csvRows[2].month, 3)
+        XCTAssertEqual(data.csvRows[2].projectKey, "/zzz")
+    }
+
+    func testEarliestEventDateReflectsStore() async throws {
+        let cal = Calendar.current
+        func mkDate(_ year: Int, _ month: Int) -> Date {
+            cal.date(from: DateComponents(year: year, month: month, day: 15, hour: 12))!
+        }
+        let emptyStore = try makeStore(events: [])
+        let emptyVM = makeViewModel(store: emptyStore, pricing: PricingTable(rates: [:]))
+        XCTAssertNil(emptyVM.earliestEventDate())
+
+        let populatedStore = try makeStore(events: [
+            UsageEntry(timestamp: mkDate(2024, 7), sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 1, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+            UsageEntry(timestamp: mkDate(2026, 1), sessionId: "s", projectPath: "/p",
+                       model: "m", inputTokens: 1, outputTokens: 0,
+                       cacheCreationTokens: 0, cacheReadTokens: 0),
+        ])
+        let vm = makeViewModel(store: populatedStore, pricing: PricingTable(rates: [:]))
+        XCTAssertEqual(vm.earliestEventDate(), mkDate(2024, 7))
+    }
 }
