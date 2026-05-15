@@ -52,6 +52,15 @@ final class SQLite {
         func bind(_ index: Int32, _ value: String) -> Statement {
             sqlite3_bind_text(stmt, index, value, -1, SQLite.SQLITE_TRANSIENT); return self
         }
+        @discardableResult
+        func bind(_ index: Int32, _ value: String?) -> Statement {
+            if let value = value {
+                sqlite3_bind_text(stmt, index, value, -1, SQLite.SQLITE_TRANSIENT)
+            } else {
+                sqlite3_bind_null(stmt, index)
+            }
+            return self
+        }
 
         func step() throws -> Bool {
             let rc = sqlite3_step(stmt)

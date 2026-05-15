@@ -53,8 +53,15 @@ final class UsageStore: @unchecked Sendable {
     private let db: SQLite
     private let queue = DispatchQueue(label: "claude-stats.usagestore")
 
+    /// Bump this when usage_event's shape changes in a way that makes
+    /// already-stored rows wrong. The init wipes both tables when an older
+    /// version is detected so a full rescan re-populates them.
+    /// v2: added (message_id, request_id) for dedup matching ccusage.
+    private static let schemaVersion: Int64 = 2
+
     init(path: String) throws {
         self.db = try SQLite(path: path)
+        try Self.migrateIfNeeded(db: db)
         try db.exec("""
             CREATE TABLE IF NOT EXISTS usage_event (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,11 +73,20 @@ final class UsageStore: @unchecked Sendable {
                 input_tokens INTEGER NOT NULL,
                 output_tokens INTEGER NOT NULL,
                 cache_create_tokens INTEGER NOT NULL,
-                cache_read_tokens INTEGER NOT NULL
+                cache_read_tokens INTEGER NOT NULL,
+                message_id TEXT,
+                request_id TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_usage_ts ON usage_event(timestamp);
             CREATE INDEX IF NOT EXISTS idx_usage_proj_ts ON usage_event(project_key, timestamp);
             CREATE INDEX IF NOT EXISTS idx_usage_session ON usage_event(session_id);
+            -- Partial unique index: dedupe assistant events by (message.id, requestId)
+            -- when both are present. Same logic ccusage uses. Rows missing either
+            -- key are never duplicates as far as this index is concerned, so
+            -- INSERT OR IGNORE always lets them through.
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_dedup
+                ON usage_event(message_id, request_id)
+                WHERE message_id IS NOT NULL AND request_id IS NOT NULL;
             CREATE TABLE IF NOT EXISTS file_state (
                 path TEXT PRIMARY KEY,
                 mtime INTEGER NOT NULL,
@@ -80,15 +96,38 @@ final class UsageStore: @unchecked Sendable {
         """)
     }
 
+    private static func migrateIfNeeded(db: SQLite) throws {
+        let current: Int64 = try {
+            // Scope the prepared statement so it's finalized before any DROP
+            // — an unfinalized read holds a lock that blocks schema changes.
+            let stmt = try db.prepare("PRAGMA user_version")
+            _ = try stmt.step()
+            return stmt.int(0)
+        }()
+        if current >= schemaVersion { return }
+        // Drop both tables: usage_event rows were double-counted under the old
+        // schema (no dedup), and file_state must be cleared so UsageReader
+        // rescans every JSONL from offset 0 to rebuild with the new shape.
+        try db.exec("""
+            DROP TABLE IF EXISTS usage_event;
+            DROP TABLE IF EXISTS file_state;
+            PRAGMA user_version = \(schemaVersion);
+        """)
+    }
+
     func insert(_ entries: [UsageEntry]) throws {
         guard !entries.isEmpty else { return }
         try queue.sync {
             try db.transaction {
+                // INSERT OR IGNORE: conflict on idx_usage_dedup silently drops
+                // duplicate (message_id, request_id) pairs that Claude Code wrote
+                // to multiple JSONL files (subagent forks, session resumes).
                 let stmt = try db.prepare("""
-                    INSERT INTO usage_event
+                    INSERT OR IGNORE INTO usage_event
                     (timestamp, session_id, project_path, project_key, model,
-                     input_tokens, output_tokens, cache_create_tokens, cache_read_tokens)
-                    VALUES (?,?,?,?,?,?,?,?,?)
+                     input_tokens, output_tokens, cache_create_tokens, cache_read_tokens,
+                     message_id, request_id)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?)
                 """)
                 for e in entries {
                     stmt.reset()
@@ -102,6 +141,8 @@ final class UsageStore: @unchecked Sendable {
                         .bind(7, e.outputTokens)
                         .bind(8, e.cacheCreationTokens)
                         .bind(9, e.cacheReadTokens)
+                        .bind(10, e.messageId)
+                        .bind(11, e.requestId)
                     _ = try stmt.step()
                 }
             }
