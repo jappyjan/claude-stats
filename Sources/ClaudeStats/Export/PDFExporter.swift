@@ -197,17 +197,25 @@ private struct SummaryPage: View {
         return String(model.prefix(12))
     }
 
+    private static let monthBarFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM"
+        return f
+    }()
+
+    private static let rangeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        return f
+    }()
+
     private func monthLabel(year: Int, month: Int) -> String {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "MMM"
         var comps = DateComponents(); comps.year = year; comps.month = month; comps.day = 1
-        return Calendar.current.date(from: comps).map { fmt.string(from: $0) } ?? "\(month)"
+        return Calendar.current.date(from: comps).map { Self.monthBarFormatter.string(from: $0) } ?? "\(month)"
     }
 
     private func formatDate(_ d: Date) -> String {
-        let fmt = DateFormatter()
-        fmt.dateStyle = .medium
-        return fmt.string(from: d)
+        Self.rangeFormatter.string(from: d)
     }
 
     private func formatTokens(_ n: Int) -> String {

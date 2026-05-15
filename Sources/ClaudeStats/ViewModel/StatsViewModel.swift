@@ -328,11 +328,18 @@ final class StatsViewModel {
         (try? store.earliestTimestamp())
     }
 
-    /// Materialises an `ExportData` for the day-bounded range [start, end).
+    /// Materialises an `ExportData` for the user-facing date range. `start` and
+    /// `end` are day-precision bounds — `end` is INCLUSIVE (the day of `end` is
+    /// included in the export). The orchestrator expands `end` by one day
+    /// internally to query SQL with a half-open interval. The user's `start`
+    /// and `end` are stored verbatim on the returned `ExportData` so the PDF
+    /// header and filename both render the dates the user actually picked.
     /// Pricing is applied at call time from the current `PricingTable`.
     func buildExportData(start: Date, end: Date) async throws -> ExportData {
         let cal = Calendar.current
-        let raw = try store.tokensByMonthProjectModel(start: start, end: end, calendar: cal)
+        let rangeStart = cal.startOfDay(for: start)
+        let rangeEnd = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: end)) ?? end
+        let raw = try store.tokensByMonthProjectModel(start: rangeStart, end: rangeEnd, calendar: cal)
 
         var csvRows: [ExportData.CSVRow] = []
         csvRows.reserveCapacity(raw.count)
@@ -394,8 +401,8 @@ final class StatsViewModel {
             guard let monthStart = cal.date(from: startComps),
                   let monthEnd = cal.date(byAdding: .month, value: 1, to: monthStart)
             else { continue }
-            let lo = max(start, monthStart)
-            let hi = min(end, monthEnd)
+            let lo = max(rangeStart, monthStart)
+            let hi = min(rangeEnd, monthEnd)
             let sessions = try store.sessionCount(start: lo, end: hi)
             let projects = try store.tokensByProject(start: lo, end: hi)
 
@@ -445,8 +452,8 @@ final class StatsViewModel {
         // Range-wide totals.
         let totalTokens = buckets.reduce(0) { $0 + $1.totalTokens }
         let totalCost = buckets.reduce(0.0) { $0 + $1.estimatedCost }
-        let sessionCount = try store.sessionCount(start: start, end: end)
-        let allProjects = try store.tokensByProject(start: start, end: end)
+        let sessionCount = try store.sessionCount(start: rangeStart, end: rangeEnd)
+        let allProjects = try store.tokensByProject(start: rangeStart, end: rangeEnd)
         let byModelOverall: [UsageStore.ModelRow] = modelTotals.map { model, t in
             UsageStore.ModelRow(
                 model: model,

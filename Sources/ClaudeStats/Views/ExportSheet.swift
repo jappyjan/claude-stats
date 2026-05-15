@@ -10,6 +10,7 @@ struct ExportSheet: View {
     @State private var end: Date
     @State private var isExporting = false
     @State private var errorMessage: String?
+    @State private var canAllTime: Bool
 
     init(viewModel: StatsViewModel, initialYear: Int, onDismiss: @escaping () -> Void) {
         self.viewModel = viewModel
@@ -19,6 +20,7 @@ struct ExportSheet: View {
         let yearStart = cal.date(from: DateComponents(year: initialYear, month: 1, day: 1)) ?? Date()
         _start = State(initialValue: yearStart)
         _end = State(initialValue: cal.startOfDay(for: Date()))
+        _canAllTime = State(initialValue: viewModel.earliestEventDate() != nil)
     }
 
     var body: some View {
@@ -48,7 +50,7 @@ struct ExportSheet: View {
                 Button("Last 3 months") { applyLast3Months() }.buttonStyle(.bordered)
                 Button("All time") { applyAllTime() }
                     .buttonStyle(.bordered)
-                    .disabled(viewModel.earliestEventDate() == nil)
+                    .disabled(!canAllTime)
             }
 
             if let errorMessage {
@@ -105,18 +107,16 @@ struct ExportSheet: View {
         errorMessage = nil
         defer { isExporting = false }
         do {
-            let cal = Calendar.current
-            // Half-open: [start-of-day(start), start-of-day(end + 1 day))
-            let rangeStart = cal.startOfDay(for: start)
-            let rangeEnd = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: end)) ?? end
-            let data = try await viewModel.buildExportData(start: rangeStart, end: rangeEnd)
+            // The view-model treats `end` as INCLUSIVE and does the half-open
+            // expansion internally. Pass the user's chosen dates directly.
+            let data = try await viewModel.buildExportData(start: start, end: end)
             let basename = filenameBase(start: start, end: end)
             let csvURL = folder.appendingPathComponent("\(basename).csv")
             let pdfURL = folder.appendingPathComponent("\(basename).pdf")
             let csvString = CSVExporter.csv(rows: data.csvRows)
             try csvString.write(to: csvURL, atomically: true, encoding: .utf8)
             let pdfData = PDFExporter.render(data)
-            try pdfData.write(to: pdfURL)
+            try pdfData.write(to: pdfURL, options: .atomic)
             onDismiss()
         } catch {
             errorMessage = String(describing: error)

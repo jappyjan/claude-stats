@@ -310,4 +310,21 @@ final class StatsViewModelTests: XCTestCase {
         let vm = makeViewModel(store: populatedStore, pricing: PricingTable(rates: [:]))
         XCTAssertEqual(vm.earliestEventDate(), mkDate(2024, 7))
     }
+
+    func testBuildExportDataEmptyRangeYieldsZerosAndEmptyArrays() async throws {
+        let cal = Calendar.current
+        func mkDate(_ year: Int, _ month: Int, _ day: Int = 15) -> Date {
+            cal.date(from: DateComponents(year: year, month: month, day: day, hour: 12))!
+        }
+        let store = try makeStore(events: [])
+        let vm = makeViewModel(store: store, pricing: PricingTable(rates: [:]))
+        let data = try await vm.buildExportData(start: mkDate(2026, 1), end: mkDate(2026, 12))
+        XCTAssertEqual(data.totalTokens, 0)
+        XCTAssertEqual(data.estimatedCost, 0.0, accuracy: 1e-9)
+        XCTAssertEqual(data.sessionCount, 0)
+        XCTAssertEqual(data.projectCount, 0)
+        XCTAssertTrue(data.months.isEmpty)
+        XCTAssertTrue(data.csvRows.isEmpty)
+        XCTAssertTrue(data.byModelOverall.isEmpty)
+    }
 }
