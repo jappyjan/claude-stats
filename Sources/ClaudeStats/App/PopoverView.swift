@@ -7,18 +7,28 @@ struct PopoverView: View {
     @State private var section: Section = .overview
     @State private var drillProjectKey: String? = nil
     @State private var drillDetail: StatsViewModel.ProjectDetail? = nil
+    @State private var drillMonth: MonthSelection? = nil
+    @State private var drillMonthDetail: StatsViewModel.MonthDetail? = nil
+    @AppStorage("monthsBreakdown") private var monthsBreakdown: MonthsBreakdown = .total
     @Environment(\.openWindow) private var openWindow
 
-    enum Section: String, CaseIterable { case overview, projects }
+    enum Section: String, CaseIterable { case overview, projects, months }
+
+    private struct MonthSelection: Equatable {
+        let year: Int
+        let month: Int
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             statusRow
             LimitsBar(state: viewModel.limits)
-            if drillProjectKey == nil {
+            if drillProjectKey == nil && drillMonth == nil {
                 sectionTabs
-                TimeRangeTabs(selection: $viewModel.timeRange)
-                    .onChange(of: viewModel.timeRange) { Task { await viewModel.refresh() } }
+                if section != .months {
+                    TimeRangeTabs(selection: $viewModel.timeRange)
+                        .onChange(of: viewModel.timeRange) { Task { await viewModel.refresh() } }
+                }
                 Divider()
                 Group {
                     switch section {
@@ -32,11 +42,24 @@ struct PopoverView: View {
                                 Task { drillDetail = await viewModel.projectDetail(for: key) }
                             }
                         )
+                    case .months:
+                        MonthsView(
+                            viewModel: viewModel,
+                            breakdown: $monthsBreakdown,
+                            onSelectMonth: { year, month in
+                                drillMonth = MonthSelection(year: year, month: month)
+                                Task { drillMonthDetail = await viewModel.monthDetail(year: year, month: month) }
+                            }
+                        )
                     }
                 }
             } else if let detail = drillDetail {
                 ProjectDetailView(detail: detail, range: viewModel.timeRange) {
                     drillProjectKey = nil; drillDetail = nil
+                }
+            } else if let detail = drillMonthDetail {
+                MonthDetailView(detail: detail, mode: monthsBreakdown) {
+                    drillMonth = nil; drillMonthDetail = nil
                 }
             } else {
                 ProgressView().frame(maxWidth: .infinity, minHeight: 80)
