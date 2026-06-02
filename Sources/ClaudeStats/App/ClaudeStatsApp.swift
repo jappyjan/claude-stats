@@ -8,7 +8,6 @@ struct ClaudeStatsApp: App {
         MenuBarExtra {
             PopoverView(viewModel: container.viewModel, container: container)
                 .frame(width: 380)
-                .frame(maxHeight: 480)
         } label: {
             HStack(spacing: 4) {
                 Circle()
