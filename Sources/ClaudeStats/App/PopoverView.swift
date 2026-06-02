@@ -11,6 +11,8 @@ struct PopoverView: View {
     @State private var drillMonthDetail: StatsViewModel.MonthDetail? = nil
     @State private var showExport: Bool = false
     @AppStorage("monthsBreakdown") private var monthsBreakdown: MonthsBreakdown = .total
+    @AppStorage("popoverHeight") private var popoverHeight: Double = 480
+    @State private var dragStartHeight: Double? = nil
     @Environment(\.openWindow) private var openWindow
 
     enum Section: String, CaseIterable { case overview, projects, months }
@@ -91,7 +93,8 @@ struct PopoverView: View {
             }
             .padding(.horizontal, 14).padding(.vertical, 6)
         }
-        .padding(.vertical, 4)
+        .padding(.top, 4)
+        .frame(height: popoverHeight)
     }
 
     private var statusRow: some View {
