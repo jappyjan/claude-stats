@@ -92,6 +92,8 @@ struct PopoverView: View {
                 .help("Quit ClaudeStats")
             }
             .padding(.horizontal, 14).padding(.vertical, 6)
+
+            resizeHandle
         }
         .padding(.top, 4)
         .frame(height: popoverHeight)
@@ -126,6 +128,29 @@ struct PopoverView: View {
             Spacer()
         }
         .padding(.horizontal, 8)
+    }
+
+    private var resizeHandle: some View {
+        Rectangle()
+            .fill(Color.clear)
+            .contentShape(Rectangle())
+            .frame(height: 6)
+            .onHover { hovering in
+                if hovering {
+                    NSCursor.resizeUpDown.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        if dragStartHeight == nil { dragStartHeight = popoverHeight }
+                        let proposed = (dragStartHeight ?? popoverHeight) + value.translation.height
+                        popoverHeight = min(1000, max(240, proposed))
+                    }
+                    .onEnded { _ in dragStartHeight = nil }
+            )
     }
 
     private func formatTokens(_ n: Int) -> String {
